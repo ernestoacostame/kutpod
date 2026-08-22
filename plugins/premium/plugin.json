@@ -1,0 +1,8 @@
+{
+  "id": "premium",
+  "name": "Suscripciones Premium",
+  "version": "1.0.0",
+  "description": "Monetiza tus podcasts y episodios individuales con cobros mediante Stripe o PayPal, protegiendo tus archivos de audio y feeds RSS.",
+  "author": "Antigravity",
+  "main": "premium.php"
+}

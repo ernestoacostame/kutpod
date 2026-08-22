@@ -1,0 +1,18 @@
+{
+    "slug": "aboutme",
+    "title": "Acerca de",
+    "published": true,
+    "blocks": [
+        {
+            "type": "heading",
+            "level": 1,
+            "text": "Acerca de mi"
+        },
+        {
+            "type": "paragraph",
+            "text": "Mi nombre es Ernesto Acosta (también conocido como \"elav\" o \"elavdeveloper\"). Nací en Cuba, 1987. Me gradué de Ciencias de la Computación en La Habana, Cuba en 2006.\n\nDesde entonces, he estado creando varios espacios en Internet para compartir información. Fundador de DesdeLinux.net, uno de los blogs de FLOSS más populares en español.\n\nDespués de dejar el proyecto, fundé SystemInside.net, un blog sobre tecnología y un canal de YouTube con la mismo nombre. Fundé TuPodcast.com en 2016, una red de podcasting amateur.\n\nTengo un Foro donde puedes participar y dejar tu opinión sobre mi contenido.\n\nLas redes sociales que uso son Mi plataforma social, Hive, 3Speak y VERO."
+        }
+    ],
+    "updated": "2026-05-12",
+    "menu": "header"
+}

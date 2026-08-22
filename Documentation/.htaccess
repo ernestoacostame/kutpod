@@ -1,0 +1,95 @@
+# ============================================================================
+# KutPod · rewrites Apache (rutas separadas: público / panel / install / API)
+# ============================================================================
+# Coloca este archivo en la raíz pública (junto a index.php, site.php, etc.)
+
+RewriteEngine On
+Options -MultiViews
+
+# ----------------------------------------------------------------------------
+# 0) Cabeceras de seguridad HTTP
+# ----------------------------------------------------------------------------
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always set X-XSS-Protection "1; mode=block"
+</IfModule>
+
+# ----------------------------------------------------------------------------
+# 1) Instalador · /install  →  /cli/install.php
+#    Si no existe storage/kutpod.db NI storage/install.lock, FORZAR /install
+# ----------------------------------------------------------------------------
+RewriteRule ^install/?$  /cli/install.php  [QSA,L]
+
+RewriteCond %{REQUEST_URI} !^/cli/install\.php$
+RewriteCond %{REQUEST_URI} !^/install/?$
+RewriteCond %{REQUEST_URI} !^/assets/
+RewriteCond %{REQUEST_URI} !^/storage/
+RewriteCond %{DOCUMENT_ROOT}/storage/kutpod.db !-f
+RewriteCond %{DOCUMENT_ROOT}/storage/install.lock !-f
+RewriteRule ^ /install [R=302,L]
+
+# ----------------------------------------------------------------------------
+# 2) Tracker OP3 nativo · /r/{show}/{ep}/audio.mp3
+# ----------------------------------------------------------------------------
+RewriteRule ^r/([^/]+)/([^/]+)(?:/.*)?$  /r.php?show=$1&ep=$2  [QSA,L]
+
+# ----------------------------------------------------------------------------
+# 2.b) SEO · robots.txt y sitemap.xml dinámicos
+# ----------------------------------------------------------------------------
+RewriteRule ^robots\.txt$    /robots-sitemap.php?type=robots  [QSA,L]
+RewriteRule ^sitemap\.xml$   /robots-sitemap.php?type=sitemap [QSA,L]
+
+# ----------------------------------------------------------------------------
+# 3) Feeds RSS (las peticiones sin .xml caen al fallback y las procesa site.php para redirección/410)
+# ----------------------------------------------------------------------------
+RewriteRule ^feed/([a-zA-Z0-9\-]+)\.xml$  /feed.php?slug=$1  [QSA,L]
+RewriteRule ^feed\.xml$                /feed.php?slug=all [QSA,L]
+
+# ----------------------------------------------------------------------------
+# 4) API REST · /api/* → /api/index.php
+# ----------------------------------------------------------------------------
+RewriteRule ^api/(.*)$  /api/index.php?route=$1  [QSA,L]
+
+# ----------------------------------------------------------------------------
+# 5) ActivityPub
+# ----------------------------------------------------------------------------
+RewriteRule ^\.well-known/webfinger$  /activitypub.php?ap=webfinger  [QSA,L]
+RewriteRule ^users/([a-zA-Z0-9\-]+)/?$  /activitypub.php?ap=actor&slug=$1 [QSA,L]
+RewriteRule ^users/([a-zA-Z0-9\-]+)/(inbox|outbox|followers|notes/[^/]+)/?$  /activitypub.php?ap=$2&slug=$1 [QSA,L]
+
+# ----------------------------------------------------------------------------
+# 6) Panel admin · /admin  /admin/{page}
+# ----------------------------------------------------------------------------
+RewriteRule ^admin/?$                              /index.php                  [QSA,L]
+RewriteRule ^admin/login-2fa/?$                       /index.php?page=login-2fa   [QSA,L]
+RewriteRule ^admin/([a-z0-9\-]+)/?$                   /index.php?page=$1          [QSA,L]
+RewriteRule ^admin/podcast/([a-zA-Z0-9\-]+)/?$        /index.php?page=podcast&id=$1 [QSA,L]
+RewriteRule ^admin/podcast/([a-zA-Z0-9\-]+)/edit/?$   /index.php?page=edit-podcast&id=$1 [QSA,L]
+
+# ----------------------------------------------------------------------------
+# 7) Sitio público · URLs limpias (kutpod.io/@show, /shows, /p/about, /)
+# ----------------------------------------------------------------------------
+RewriteRule ^@([a-zA-Z0-9\-]+)/?$               /site.php?r=show&id=$1                  [QSA,L]
+RewriteRule ^@([a-zA-Z0-9\-]+)/([a-zA-Z0-9\-]+)/?$ /site.php?r=episode&show=$1&ep=$2       [QSA,L]
+RewriteRule ^shows/?$                        /site.php?r=shows                       [QSA,L]
+RewriteRule ^episodes/?$                     /site.php?r=episodes                    [QSA,L]
+RewriteRule ^p/([a-zA-Z0-9\-]+)/?$              /site.php?r=page&id=$1                  [QSA,L]
+
+# ----------------------------------------------------------------------------
+# 8) Raíz · home pública (FRONTEND, no panel)
+# ----------------------------------------------------------------------------
+DirectoryIndex site.php
+RewriteRule ^$  /site.php  [L]
+
+# Bloquea acceso directo a partials (no se sirven sin layout)
+RewriteRule ^(pages|includes|api/handlers|public)/  -  [F,L]
+RewriteRule ^cli/(?!install\.php)  -  [F,L]
+RewriteRule ^storage/(?!media/)  -  [F,L]
+
+# Cualquier otra cosa que no exista físicamente → home pública (nunca panel)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.+)$  /site.php?r=home  [QSA,L]

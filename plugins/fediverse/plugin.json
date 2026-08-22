@@ -1,0 +1,8 @@
+{
+  "id": "fediverse",
+  "name": "Fediverso (ActivityPub)",
+  "version": "1.0.0",
+  "description": "Federación con la red descentralizada. Permite que tus podcasts tengan perfiles autónomos en Mastodon/Fediverso para que los usuarios los sigan, escuchen y comenten directamente.",
+  "author": "Ernesto Acosta",
+  "main": "fediverse.php"
+}

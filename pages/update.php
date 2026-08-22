@@ -1,0 +1,345 @@
+<?php
+// ============================================================================
+// pages/update.php — Sistema de actualización de KutPod
+// ============================================================================
+require_once __DIR__ . '/../includes/helpers.php';
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/updater.php';
+require_once __DIR__ . '/../version.php';
+
+$hasToken = !empty(kp_setting('update_github_token', ''));
+$rollbackVersion = kp_setting('update_rollback_version', '');
+$rollbackPath = kp_setting('update_rollback_path', '');
+$hasRollback = $rollbackVersion && $rollbackPath && file_exists($rollbackPath);
+
+// Fetch all available rollbacks
+$rollbacks = kp_update_get_available_rollbacks();
+$hasAnyRollback = !empty($rollbacks);
+
+// Historial de actualizaciones
+$history = [];
+try {
+  $history = kp_q("SELECT * FROM updates ORDER BY id DESC LIMIT 20");
+} catch (Throwable $e) {}
+?>
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Actualizaciones</h1>
+    <p class="page-sub">Mantén KutPod al día · actualización con un click · rollback instantáneo</p>
+  </div>
+</div>
+
+<!-- Estado actual -->
+<div class="stat-grid">
+  <?= stat_card('Versión instalada', 'v' . KUTPOD_VERSION, 'layers', ['sub' => 'Compilación actual']) ?>
+  <?= stat_card('Token GitHub', $hasToken ? 'Configurado' : 'No configurado', 'shield',
+       $hasToken
+         ? ['sub' => 'Listo para buscar']
+         : ['sub' => 'No configurado aún', 'foot' => '<div style="margin-top:8px"><a href="/admin/preferences#update-token" style="color:var(--accent);font-size:12px">Configurar en Preferencias →</a></div>']) ?>
+  <?= stat_card('Rollback', $hasRollback ? 'v' . $rollbackVersion : 'No disponible', 'refreshCw',
+       ['sub' => $hasRollback ? 'Versión anterior guardada' : 'Se crea antes de cada update']) ?>
+  <?= stat_card('Actualizaciones', (string)count($history), 'check', ['sub' => 'aplicadas en total']) ?>
+</div>
+
+<!-- Buscar actualización -->
+<div class="card card-lg" style="padding:28px;margin-top:24px" id="update-card">
+  <div class="card-head" style="margin-bottom:20px">
+    <div>
+      <div class="card-title">Buscar actualización</div>
+      <div style="font-size:12.5px;color:var(--text-3);margin-top:4px">
+        Consulta el repositorio de GitHub para verificar si hay una nueva versión disponible.
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-check" type="button" onclick="kpUpdateCheck()" <?= $hasToken ? '' : 'disabled title="Configura el token primero"' ?>>
+      <?= icon('search',13) ?> Buscar actualizaciones
+    </button>
+  </div>
+
+  <!-- Resultado de la búsqueda (se llena por JS) -->
+  <div id="update-status" style="display:none"></div>
+
+  <!-- Panel de actualización disponible (se muestra por JS) -->
+  <div id="update-available" style="display:none">
+    <div style="background:var(--surface-2);border-radius:12px;padding:20px;margin-top:16px">
+      <div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px">
+        <div>
+          <div style="font-size:18px;font-weight:600;letter-spacing:-0.02em" id="update-version-label"></div>
+          <div style="font-size:12.5px;color:var(--text-3);margin-top:4px" id="update-date-label"></div>
+        </div>
+        <div class="row" style="gap:8px;flex-wrap:wrap">
+          <a id="update-gh-link" href="#" target="_blank" rel="noopener" class="btn btn-ghost" style="font-size:12px"><?= icon('arrowUp',13) ?> Ver en GitHub</a>
+          <button class="btn btn-primary" id="btn-apply" onclick="kpUpdateApply()">
+            <?= icon('download',13) ?> Actualizar ahora
+          </button>
+        </div>
+      </div>
+
+      <!-- Changelog -->
+      <div id="update-changelog" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-bottom:8px">Notas de la versión</div>
+        <div id="update-changelog-body" style="font-size:13.5px;line-height:1.7;color:var(--text-2);white-space:pre-wrap"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barra de progreso -->
+  <div id="update-progress" style="display:none;margin-top:16px">
+    <div style="background:var(--surface-2);border-radius:12px;padding:20px">
+      <div style="font-size:14px;font-weight:500;margin-bottom:12px" id="progress-label">Preparando...</div>
+      <div style="background:var(--border);border-radius:6px;height:8px;overflow:hidden">
+        <div id="progress-bar" style="background:var(--accent);height:100%;border-radius:6px;width:0%;transition:width 0.6s ease"></div>
+      </div>
+      <div style="font-size:12px;color:var(--text-3);margin-top:8px" id="progress-sub"></div>
+    </div>
+  </div>
+
+  <!-- Resultado de la actualización -->
+  <div id="update-result" style="display:none;margin-top:16px">
+    <div style="border-radius:12px;padding:20px" id="update-result-card">
+      <div style="font-size:16px;font-weight:600" id="result-title"></div>
+      <div style="font-size:13.5px;color:var(--text-2);margin-top:6px" id="result-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Rollback -->
+<?php if ($hasAnyRollback): ?>
+<div class="card card-lg" style="padding:28px;margin-top:24px">
+  <div class="card-head" style="align-items:flex-start;flex-wrap:wrap;gap:16px">
+    <div style="flex:1;min-width:250px">
+      <div class="card-title"><?= icon('refreshCw',16) ?> Revertir actualización</div>
+      <div style="font-size:12.5px;color:var(--text-3);margin-top:4px">
+        Restaura una versión previamente guardada de KutPod. Los datos (episodios, podcasts, estadísticas) no se verán afectados.
+      </div>
+      <div style="margin-top:14px">
+        <label class="label" style="display:block;margin-bottom:6px">Seleccionar copia de seguridad:</label>
+        <select class="select" id="rollback-select" style="max-width:100%;width:320px">
+          <?php foreach ($rollbacks as $rb): 
+            $isSelected = ($hasRollback && $rb['path'] === $rollbackPath) ? 'selected' : '';
+          ?>
+            <option value="<?= e($rb['filename']) ?>" <?= $isSelected ?>>
+              v<?= e($rb['version']) ?> (<?= e($rb['date']) ?>)
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+    </div>
+    <button class="btn" id="btn-rollback" onclick="kpUpdateRollback()" style="color:#f59e0b;border-color:#f59e0b44;margin-top:24px">
+      <?= icon('refreshCw',13) ?> Revertir a la versión seleccionada
+    </button>
+  </div>
+  <div id="rollback-status" style="display:none;margin-top:14px"></div>
+</div>
+<?php endif; ?>
+
+<!-- Historial -->
+<div class="card card-lg" style="padding:0;margin-top:24px">
+  <div class="card-head" style="padding:20px 24px">
+    <div class="card-title">Historial de actualizaciones</div>
+  </div>
+  <?php if (!$history): ?>
+    <div style="padding:48px;text-align:center;color:var(--text-3)">
+      Sin actualizaciones registradas todavía.
+    </div>
+  <?php else: ?>
+    <div class="list">
+      <div style="display:grid;grid-template-columns:1fr 1fr 130px 130px;gap:14px;padding:10px 24px;font-size:11px;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;border-bottom:1px solid var(--border)">
+        <div>De → A</div><div>Estado</div><div>Fecha</div><div>Backup</div>
+      </div>
+      <?php foreach ($history as $h):
+        $statusColor = $h['status'] === 'applied' ? '#10b981' : '#f59e0b';
+        $statusLabel = $h['status'] === 'applied' ? 'Aplicada' : 'Revertida';
+      ?>
+        <div style="display:grid;grid-template-columns:1fr 1fr 130px 130px;gap:14px;padding:14px 24px;align-items:center;border-bottom:1px solid var(--border);font-size:13.5px">
+          <div>
+            <span style="color:var(--text-3)">v<?= e($h['from_version']) ?></span>
+            <span style="color:var(--text-3);margin:0 6px">→</span>
+            <span style="font-weight:600">v<?= e($h['to_version']) ?></span>
+          </div>
+          <div><span class="tag" style="background:<?= $statusColor ?>22;color:<?= $statusColor ?>;font-size:11px"><?= e($statusLabel) ?></span></div>
+          <div style="color:var(--text-2);font-size:12.5px"><?= e(kp_relative_time($h['applied_at'])) ?></div>
+          <div style="font-size:12px;color:var(--text-3);font-family:ui-monospace,monospace">
+            <?= !empty($h['backup_path']) && file_exists($h['backup_path']) ? '✓ guardado' : '—' ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</div>
+
+<script>
+let _updateData = null;
+
+function kpUpdateCheck() {
+  const btn = document.getElementById('btn-check');
+  const status = document.getElementById('update-status');
+  const available = document.getElementById('update-available');
+
+  btn.disabled = true;
+  btn.innerHTML = '<?= icon('search',13) ?> Buscando...';
+  status.style.display = 'block';
+  status.innerHTML = '<div style="padding:14px;color:var(--text-3);font-size:13.5px">Consultando GitHub...</div>';
+  available.style.display = 'none';
+
+  fetch('/api/update?action=check')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        status.innerHTML = '<div style="padding:14px;color:#ef4444;font-size:13.5px">❌ ' + data.error + '</div>';
+        return;
+      }
+      if (data.up_to_date) {
+        status.innerHTML = '<div style="padding:14px;color:#10b981;font-size:13.5px">✅ KutPod está actualizado — v' + data.version + '</div>';
+        return;
+      }
+      if (data.available) {
+        _updateData = data;
+        status.style.display = 'none';
+        available.style.display = 'block';
+        document.getElementById('update-version-label').textContent = data.name || ('v' + data.new_version);
+        document.getElementById('update-date-label').textContent = data.published_at
+          ? 'Publicado el ' + new Date(data.published_at).toLocaleDateString('es', {year:'numeric', month:'long', day:'numeric'})
+          : '';
+        document.getElementById('update-changelog-body').textContent = data.changelog || 'Sin notas de la versión.';
+        document.getElementById('update-gh-link').href = data.html_url || '#';
+      }
+    })
+    .catch(e => {
+      status.innerHTML = '<div style="padding:14px;color:#ef4444;font-size:13.5px">❌ Error de conexión: ' + e.message + '</div>';
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = '<?= icon('search',13) ?> Buscar actualizaciones';
+    });
+}
+
+function kpUpdateApply() {
+  if (!_updateData) return;
+  if (!confirm('¿Actualizar KutPod de v' + _updateData.current_version + ' a v' + _updateData.new_version + '?\n\nSe creará un backup automáticamente antes de aplicar los cambios.')) return;
+
+  const btn = document.getElementById('btn-apply');
+  const progress = document.getElementById('update-progress');
+  const progressBar = document.getElementById('progress-bar');
+  const progressLabel = document.getElementById('progress-label');
+  const progressSub = document.getElementById('progress-sub');
+  const result = document.getElementById('update-result');
+  const resultCard = document.getElementById('update-result-card');
+  const available = document.getElementById('update-available');
+
+  const showError = (msg) => {
+    progress.style.display = 'none';
+    result.style.display = 'block';
+    resultCard.style.background = '#ef444422';
+    document.getElementById('result-title').textContent = '❌ Error';
+    document.getElementById('result-body').textContent = msg;
+    
+    // Permitir reintentar
+    btn.disabled = false;
+    available.style.display = 'block';
+  };
+
+  btn.disabled = true;
+  available.style.display = 'none';
+  result.style.display = 'none'; // Ocultar error anterior al reintentar
+  progress.style.display = 'block';
+
+  // Paso 1: Descargar
+  progressLabel.textContent = 'Paso 1/2: Descargando actualización...';
+  progressSub.textContent = 'Obteniendo v' + _updateData.new_version + ' desde GitHub';
+  progressBar.style.width = '25%';
+
+  const dlBody = new URLSearchParams({
+    action: 'download',
+    zip_url: btoa(_updateData.zip_url)
+  });
+
+  fetch('/api/update', { method: 'POST', body: dlBody })
+    .then(async r => {
+      const text = await r.text();
+      try {
+        return JSON.parse(text);
+      } catch(e) {
+        throw new Error('El servidor devolvió un error (HTTP ' + r.status + '):\n' + text.substring(0, 150) + '...');
+      }
+    })
+    .then(dlData => {
+      if (dlData.error) return showError(dlData.error);
+
+      // Paso 2: Aplicar
+      progressLabel.textContent = 'Paso 2/2: Creando respaldo y aplicando...';
+      progressSub.textContent = 'Respaldando y copiando ficheros nuevos';
+      progressBar.style.width = '65%';
+
+      const applyBody = new URLSearchParams({
+        action: 'apply',
+        zip_path: dlData.path,
+        new_version: _updateData.new_version
+      });
+
+      return fetch('/api/update', { method: 'POST', body: applyBody })
+        .then(async r => {
+          const text = await r.text();
+          try {
+            return JSON.parse(text);
+          } catch(e) {
+            throw new Error('El servidor devolvió un error (HTTP ' + r.status + '):\n' + text.substring(0, 150) + '...');
+          }
+        })
+        .then(data => {
+          if (data.error) return showError(data.error);
+          if (data.success) {
+            progressBar.style.width = '100%';
+            progress.style.display = 'none';
+            result.style.display = 'block';
+            resultCard.style.background = '#10b98122';
+            document.getElementById('result-title').textContent = '✅ Actualización completada';
+            document.getElementById('result-body').innerHTML =
+              'KutPod actualizado de <strong>v' + data.from + '</strong> a <strong>v' + data.to + '</strong>. ' +
+              data.files_updated + ' ficheros actualizados.<br><br>' +
+              '<a href="/admin/update" class="btn btn-primary" style="margin-top:8px">Recargar página</a>';
+          }
+        });
+    })
+    .catch(e => showError(e.message));
+}
+
+function kpUpdateRollback() {
+  const select = document.getElementById('rollback-select');
+  const backupFile = select ? select.value : '';
+  if (!backupFile) {
+    alert('Por favor, selecciona una copia de seguridad para restaurar.');
+    return;
+  }
+
+  const option = select.options[select.selectedIndex];
+  const versionText = option ? option.text : 'la versión seleccionada';
+
+  if (!confirm('¿Revertir KutPod a ' + versionText + '?\n\nSe restaurarán todos los ficheros del código. Tus datos (podcasts, episodios, estadísticas) no se verán afectados.')) return;
+
+  const btn = document.getElementById('btn-rollback');
+  const status = document.getElementById('rollback-status');
+  btn.disabled = true;
+  status.style.display = 'block';
+  status.innerHTML = '<div style="padding:14px;color:var(--text-3);font-size:13.5px"><?= icon('refreshCw',13) ?> Restaurando...</div>';
+
+  fetch('/api/update', {
+    method: 'POST',
+    body: new URLSearchParams({ action: 'rollback', backup_file: backupFile })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        status.innerHTML = '<div style="padding:14px;color:#ef4444;font-size:13.5px">❌ ' + data.error + '</div>';
+        btn.disabled = false;
+        return;
+      }
+      if (data.success) {
+        status.innerHTML = '<div style="padding:14px;background:#10b98122;border-radius:8px;font-size:13.5px">✅ Rollback completado. Restaurada versión <strong>v' + data.restored_version + '</strong>.<br><br><a href="/admin/update" class="btn btn-primary" style="margin-top:8px">Recargar página</a></div>';
+      }
+    })
+    .catch(e => {
+      status.innerHTML = '<div style="padding:14px;color:#ef4444;font-size:13.5px">❌ Error: ' + e.message + '</div>';
+      btn.disabled = false;
+    });
+}
+</script>

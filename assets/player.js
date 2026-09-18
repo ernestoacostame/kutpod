@@ -53,44 +53,88 @@
     };
     $('#kpClose').onclick = () => { audio.pause(); el.remove(); };
 
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    const isVolumeSettable = (() => {
+      if (isIOS) return false;
+      try {
+        const a = document.createElement('audio');
+        a.volume = 0.5;
+        return Math.abs(a.volume - 0.5) < 0.05;
+      } catch (e) {
+        return false;
+      }
+    })();
+
     let lastVolume = 1;
     const volBtn = $('#kpVolBtn');
     const volSlider = $('#kpVolume');
 
-    const updateVolumeUI = (vol) => {
-      volSlider.value = vol;
-      const pct = vol * 100;
-      volSlider.style.background = `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, color-mix(in srgb, var(--pub-text) 15%, transparent) ${pct}%, color-mix(in srgb, var(--pub-text) 15%, transparent) 100%)`;
-      if (vol === 0) {
+    if (!isVolumeSettable) {
+      volSlider.style.display = 'none';
+    }
+
+    const updateVolumeUI = () => {
+      const isMuted = audio.muted || (isVolumeSettable && audio.volume === 0);
+      if (isMuted) {
         volBtn.textContent = '🔇';
-      } else if (vol < 0.5) {
-        volBtn.textContent = '🔉';
+        volBtn.title = 'Activar sonido';
+        volBtn.setAttribute('aria-label', 'Activar sonido');
+        if (isVolumeSettable) {
+          volSlider.value = 0;
+          volSlider.style.background = `linear-gradient(to right, var(--accent) 0%, var(--accent) 0%, color-mix(in srgb, var(--pub-text) 15%, transparent) 0%, color-mix(in srgb, var(--pub-text) 15%, transparent) 100%)`;
+        }
       } else {
-        volBtn.textContent = '🔊';
+        const vol = isVolumeSettable ? audio.volume : 1;
+        if (vol < 0.5) {
+          volBtn.textContent = '🔉';
+        } else {
+          volBtn.textContent = '🔊';
+        }
+        volBtn.title = 'Silenciar';
+        volBtn.setAttribute('aria-label', 'Silenciar');
+        if (isVolumeSettable) {
+          volSlider.value = vol;
+          const pct = vol * 100;
+          volSlider.style.background = `linear-gradient(to right, var(--accent) 0%, var(--accent) ${pct}%, color-mix(in srgb, var(--pub-text) 15%, transparent) ${pct}%, color-mix(in srgb, var(--pub-text) 15%, transparent) 100%)`;
+        }
       }
     };
 
-    updateVolumeUI(audio.volume);
+    updateVolumeUI();
 
     volBtn.onclick = () => {
-      if (audio.volume > 0) {
-        lastVolume = audio.volume;
-        audio.volume = 0;
-        updateVolumeUI(0);
+      if (audio.muted || (isVolumeSettable && audio.volume === 0)) {
+        audio.muted = false;
+        if (isVolumeSettable && audio.volume === 0) {
+          audio.volume = lastVolume > 0 ? lastVolume : 1;
+        }
       } else {
-        audio.volume = lastVolume > 0 ? lastVolume : 1;
-        updateVolumeUI(audio.volume);
+        if (isVolumeSettable) {
+          lastVolume = audio.volume;
+        }
+        audio.muted = true;
       }
+      updateVolumeUI();
     };
 
-    volSlider.oninput = (e) => {
-      const vol = parseFloat(e.target.value);
-      audio.volume = vol;
-      if (vol > 0) {
-        lastVolume = vol;
-      }
-      updateVolumeUI(vol);
-    };
+    if (isVolumeSettable) {
+      volSlider.oninput = (e) => {
+        const vol = parseFloat(e.target.value);
+        if (vol > 0) {
+          audio.muted = false;
+          audio.volume = vol;
+          lastVolume = vol;
+        } else {
+          audio.volume = 0;
+          audio.muted = true;
+        }
+        updateVolumeUI();
+      };
+    }
+
+    audio.onvolumechange = updateVolumeUI;
     
     let scrubDragging = false;
     const scrubEl = $('#kpScrub');

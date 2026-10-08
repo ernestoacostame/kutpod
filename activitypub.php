@@ -262,7 +262,15 @@ function kp_ap_inbox(string $slug): void {
       
       $actionName = $a['type'] === 'Like' ? 'Me Gusta' : 'Boost';
       $bodyMsg = $a['type'] === 'Like' ? "Alguien le ha dado like a una publicación de" : "Alguien ha compartido una publicación de";
-      kp_alert('fediverse', "Nuevo $actionName", "$bodyMsg '{$p['title']}'.", $a['object'] ?? '', [
+      
+      $rawObj = $a['object'] ?? '';
+      $targetLink = is_string($rawObj) ? $rawObj : ($rawObj['id'] ?? $rawObj['url'] ?? '');
+      if ($targetLink && preg_match('#/users/([^/]+)/notes/([^/?#]+)#', $targetLink, $m)) {
+        $cleanEp = preg_replace('/-\d+$/', '', $m[2]);
+        $targetLink = kp_ap_base() . "/@" . $m[1] . "/" . $cleanEp;
+      }
+
+      kp_alert('fediverse', "Nuevo $actionName", "$bodyMsg '{$p['title']}'.", $targetLink, [
         'actor_url' => $actor, 'action_type' => $a['type'], 'actor_avatar' => $avatar, 'actor_name' => $name
       ]);
       break;
@@ -710,7 +718,7 @@ function kp_ap_note(string $slug, string $epSlug): void {
 // ---------------------------------------------------------------------------
 // Mini-router (solo si se ejecuta directamente)
 // ---------------------------------------------------------------------------
-if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) {
+if ((isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath($_SERVER['SCRIPT_FILENAME'])) || isset($_GET['ap'])) {
   $ap = $_GET['ap'] ?? '';
   $slug = strtolower($_GET['slug'] ?? '');
   
@@ -720,6 +728,25 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath($_SERV
   }
   
   $is_get = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET';
+
+  // Negociación de contenido: si la petición proviene de un navegador web humano (pide text/html
+  // y no especifica ActivityPub JSON), redirigir a la vista web pública en vez de escupir JSON crudo
+  $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+  $wants_html = str_contains($accept, 'text/html');
+  $wants_ap = str_contains($accept, 'application/activity+json') || str_contains($accept, 'application/ld+json') || str_contains($accept, 'application/jrd+json');
+  
+  if ($is_get && $wants_html && !$wants_ap) {
+    if ($ap === 'actor' || $ap === 'outbox' || $ap === 'followers') {
+      header('Location: ' . kp_ap_base() . '/@' . $slug, true, 302);
+      exit;
+    }
+    if ($ap === 'note') {
+      $cleanEp = preg_replace('/-\d+$/', '', $_GET['ep'] ?? '');
+      header('Location: ' . kp_ap_base() . '/@' . $slug . '/' . $cleanEp, true, 302);
+      exit;
+    }
+  }
+
   $cache_key = 'ap_' . $ap . '_' . md5(json_encode($_GET));
   
   if ($is_get && $ap !== 'inbox' && $ap !== '') {
@@ -727,7 +754,7 @@ if (isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath($_SERV
     $cached = kp_cache_get($cache_key);
     if ($cached) {
       header('Content-Type: ' . ($ap === 'webfinger' ? 'application/jrd+json' : 'application/activity+json') . '; charset=utf-8');
-      echo $cached;
+      echo is_array($cached) ? json_encode($cached, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : $cached;
       exit;
     }
     ob_start();

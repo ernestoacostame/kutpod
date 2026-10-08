@@ -157,7 +157,16 @@ $kind_meta = [
             
             <?php if (!empty($a['actor_name'])): ?>
               <div style="font-size:13px;font-weight:500;margin-bottom:2px">
-                <?= e($a['actor_name']) ?> <span class="muted" style="font-weight:normal;font-size:12px;opacity:0.7">&lt;<?= e($a['actor_url']) ?>&gt;</span>
+                <?php if (!empty($a['actor_url'])): ?>
+                  <a href="<?= e($a['actor_url']) ?>" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;border-bottom:1px dotted currentColor" title="Ver perfil en el Fediverso">
+                    <?= e($a['actor_name']) ?>
+                  </a>
+                  <a href="<?= e($a['actor_url']) ?>" target="_blank" rel="noopener noreferrer" class="muted" style="font-weight:normal;font-size:12px;opacity:0.7;margin-left:4px">
+                    &lt;<?= e($a['actor_url']) ?>&gt;
+                  </a>
+                <?php else: ?>
+                  <?= e($a['actor_name']) ?>
+                <?php endif; ?>
               </div>
             <?php endif; ?>
 
@@ -165,17 +174,41 @@ $kind_meta = [
               <div class="muted" style="font-size:13px"><?= e($a['body']) ?></div>
             <?php endif; ?>
             <?php if (!empty($a['link']) && $a['link'] !== '/admin/alerts'):
-              $linkLabel = 'Ver detalle →';
               $lnk = $a['link'];
-              if (str_contains($lnk, 'new-episode'))       $linkLabel = 'Ver episodio →';
-              elseif (str_contains($lnk, 'tab=analytics'))  $linkLabel = 'Ver estadísticas →';
-              elseif (str_contains($lnk, '/admin/podcast/'))$linkLabel = 'Ver podcast →';
-              elseif (str_contains($lnk, '/admin/import'))  $linkLabel = 'Ver importación →';
-              elseif (str_contains($lnk, '/admin/analytics'))$linkLabel = 'Ver estadísticas →';
-              elseif (str_contains($lnk, 'flarum') || str_contains($lnk, '/d/')) $linkLabel = 'Ver en foro →';
-              elseif (str_starts_with(strtolower($lnk), 'http'))        $linkLabel = 'Ver perfil →';
+              // Si el enlace apunta a una nota o actor ActivityPub interno, convertir a vista web pública
+              if (preg_match('#/users/([^/]+)/notes/([^/?#]+)#', $lnk, $m)) {
+                $cleanEp = preg_replace('/-\d+$/', '', $m[2]);
+                $lnk = "/@" . $m[1] . "/" . $cleanEp;
+              } elseif (preg_match('#/users/([^/?#]+)/?$#', $lnk, $m)) {
+                $lnk = "/@" . $m[1];
+              }
+
+              $linkLabel = 'Ver detalle →';
+              $actionType = $a['action_type'] ?? '';
+
+              if (str_contains($lnk, 'new-episode') || str_contains($lnk, '/notes/')) {
+                $linkLabel = 'Ver episodio →';
+              } elseif (str_contains($lnk, 'tab=analytics') || str_contains($lnk, '/admin/analytics')) {
+                $linkLabel = 'Ver estadísticas →';
+              } elseif (str_contains($lnk, '/admin/podcast/')) {
+                $linkLabel = 'Ver podcast →';
+              } elseif (str_contains($lnk, '/admin/import')) {
+                $linkLabel = 'Ver importación →';
+              } elseif (str_contains($lnk, 'flarum') || str_contains($lnk, '/d/')) {
+                $linkLabel = 'Ver en foro →';
+              } elseif ($actionType === 'Like' || $actionType === 'Announce') {
+                $linkLabel = 'Ver publicación →';
+              } elseif ($actionType === 'Reply') {
+                $linkLabel = 'Ver comentario →';
+              } elseif ($actionType === 'Follow' || (!empty($a['actor_url']) && $lnk === $a['actor_url'])) {
+                $linkLabel = 'Ver perfil →';
+              } elseif (str_starts_with(strtolower($lnk), 'http')) {
+                $linkLabel = 'Ver enlace →';
+              }
+
+              $is_external = str_starts_with(strtolower($lnk), 'http');
             ?>
-              <a href="<?= e($a['link']) ?>" style="font-size:12px;color:<?= $color ?>;margin-top:4px;display:inline-block"><?= $linkLabel ?></a>
+              <a href="<?= e($lnk) ?>" <?= $is_external ? 'target="_blank" rel="noopener noreferrer"' : '' ?> style="font-size:12px;color:<?= $color ?>;margin-top:4px;display:inline-block"><?= $linkLabel ?></a>
             <?php endif; ?>
           </div>
         </div>

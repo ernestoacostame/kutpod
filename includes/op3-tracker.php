@@ -241,7 +241,7 @@ function kp_op3_process_pending(int $batch = 5000): array {
 
   // Trae lote de hits sin procesar
   $hits = kp_q("SELECT * FROM op3_hits WHERE processed = 0 ORDER BY id LIMIT ?", [$batch]);
-  if (!$hits) return ['processed' => 0, 'inserted' => 0, 'duplicates' => 0, 'by_podcast' => []];
+  if (!$hits) return ['processed' => 0, 'inserted' => 0, 'duplicates' => 0, 'by_podcast' => [], 'by_episode' => [], 'by_podcast_episode' => []];
 
   // Para dedupe necesitamos saber qué download_hash YA está contado en las últimas 24h.
   // Lo cargamos en memoria una vez (clave: download_hash → ['date'=>..., 'is_first_two'=>bool])
@@ -252,7 +252,7 @@ function kp_op3_process_pending(int $batch = 5000): array {
     $existing[$r['download_hash']] = $r;
   }
 
-  $inserted = 0; $dups = 0; $by_podcast = [];
+  $inserted = 0; $dups = 0; $by_podcast = []; $by_episode = []; $by_podcast_episode = [];
   $insert = $pdo->prepare(
     "INSERT INTO op3_downloads (download_hash,date,ts,episode_id,podcast_id,audience_id,
        hashed_ip,agent_type,agent_name,device_type,device_name,referrer_type,referrer_name,
@@ -329,7 +329,12 @@ function kp_op3_process_pending(int $batch = 5000): array {
     ]);
     
     $podId = (int)$h['podcast_id'];
+    $epId  = (int)($h['episode_id'] ?? 0);
     $by_podcast[$podId] = ($by_podcast[$podId] ?? 0) + 1;
+    if ($epId > 0) {
+      $by_episode[$epId] = ($by_episode[$epId] ?? 0) + 1;
+      $by_podcast_episode[$podId][$epId] = ($by_podcast_episode[$podId][$epId] ?? 0) + 1;
+    }
     
     $existing[$download] = ['date' => $date, 'tags' => implode(',', $tags)];
     $inserted++;
@@ -340,7 +345,14 @@ function kp_op3_process_pending(int $batch = 5000): array {
   $datesTouched = array_unique(array_map(fn($h) => substr($h['ts'], 0, 10), $hits));
   foreach ($datesTouched as $d) kp_op3_recompute_daily($d);
 
-  return ['processed' => count($hits), 'inserted' => $inserted, 'duplicates' => $dups, 'by_podcast' => $by_podcast];
+  return [
+    'processed' => count($hits),
+    'inserted' => $inserted,
+    'duplicates' => $dups,
+    'by_podcast' => $by_podcast,
+    'by_episode' => $by_episode,
+    'by_podcast_episode' => $by_podcast_episode,
+  ];
 }
 
 function kp_op3_recompute_daily(string $date): void {

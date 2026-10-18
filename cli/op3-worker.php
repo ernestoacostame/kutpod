@@ -7,12 +7,19 @@ require_once __DIR__ . '/../includes/helpers.php';
 if (php_sapi_name() !== 'cli') { http_response_code(403); exit; }
 $total = ['processed' => 0, 'inserted' => 0, 'duplicates' => 0];
 $by_podcast = [];
+$by_podcast_episode = [];
 do {
   $r = kp_op3_process_pending(5000);
   foreach ($r as $k => $v) {
     if ($k === 'by_podcast') {
       foreach ($v as $pid => $cnt) {
         $by_podcast[$pid] = ($by_podcast[$pid] ?? 0) + $cnt;
+      }
+    } elseif ($k === 'by_podcast_episode') {
+      foreach ($v as $pid => $eps) {
+        foreach ($eps as $eid => $cnt) {
+          $by_podcast_episode[$pid][$eid] = ($by_podcast_episode[$pid][$eid] ?? 0) + $cnt;
+        }
       }
     } else {
       $total[$k] += $v;
@@ -24,20 +31,86 @@ printf("[%s] OP3 worker · hits:%d downloads:%d dups:%d\n",
 
 // Alerta de analytics solo si hubo descargas procesadas
 if ($total['inserted'] > 0) {
-  $detail = [];
-  foreach ($by_podcast as $pid => $cnt) {
-    if ($cnt > 0) {
-      $p = kp_one("SELECT title FROM podcasts WHERE id = ?", [$pid]);
-      $pname = $p['title'] ?? 'Podcast Desconocido';
-      $detail[] = "{$cnt} en '{$pname}'";
+  $dlCount = (int)$total['inserted'];
+  $dlStr = $dlCount === 1 ? '1 descarga registrada' : "{$dlCount} descargas registradas";
+  $dupCount = (int)$total['duplicates'];
+  $dupStr = $dupCount === 1 ? '1 duplicado filtrado' : "{$dupCount} duplicados filtrados";
+
+  $link = '';
+  $podCount = count($by_podcast_episode);
+
+  if ($podCount === 1) {
+    $pid = array_key_first($by_podcast_episode);
+    $eps = $by_podcast_episode[$pid];
+    $p = kp_one("SELECT title, slug FROM podcasts WHERE id = ?", [$pid]);
+    $pname = $p['title'] ?? 'Podcast Desconocido';
+    if (!empty($p['slug'])) {
+      $link = '/admin/podcast/' . urlencode($p['slug']) . '?tab=analytics';
+    }
+
+    if (count($eps) === 1) {
+      $eid = array_key_first($eps);
+      $e = kp_one("SELECT title FROM episodes WHERE id = ?", [$eid]);
+      $ename = $e['title'] ?? 'Episodio';
+      $body = "'{$ename}' ('{$pname}'): {$dlStr}. ({$dupStr}).";
+    } else {
+      $epParts = [];
+      $shown = 0;
+      foreach ($eps as $eid => $cnt) {
+        $shown++;
+        if ($shown <= 3) {
+          $e = kp_one("SELECT title FROM episodes WHERE id = ?", [$eid]);
+          $ename = $e['title'] ?? 'Episodio';
+          $epParts[] = "'{$ename}' ({$cnt})";
+        }
+      }
+      if (count($eps) > 3) {
+        $epParts[] = 'y ' . (count($eps) - 3) . ' más';
+      }
+      $body = implode(', ', $epParts) . " ('{$pname}'): {$dlStr}. ({$dupStr}).";
+    }
+  } elseif ($podCount > 1) {
+    $podParts = [];
+    foreach ($by_podcast_episode as $pid => $eps) {
+      $p = kp_one("SELECT title, slug FROM podcasts WHERE id = ?", [$pid]);
+      $pname = $p['title'] ?? 'Podcast';
+      $epParts = [];
+      $shown = 0;
+      foreach ($eps as $eid => $cnt) {
+        $shown++;
+        if ($shown <= 2) {
+          $e = kp_one("SELECT title FROM episodes WHERE id = ?", [$eid]);
+          $ename = $e['title'] ?? 'Episodio';
+          $epParts[] = "'{$ename}' ({$cnt})";
+        }
+      }
+      if (count($eps) > 2) {
+        $epParts[] = 'y ' . (count($eps) - 2) . ' más';
+      }
+      $podParts[] = implode(', ', $epParts) . " ('{$pname}')";
+    }
+    $body = implode('; ', $podParts) . ": {$dlStr}. ({$dupStr}).";
+    $link = '/admin/analytics';
+  } else {
+    // Fallback si por alguna razón no vinieron episode_id
+    $detail = [];
+    foreach ($by_podcast as $pid => $cnt) {
+      if ($cnt > 0) {
+        $p = kp_one("SELECT title, slug FROM podcasts WHERE id = ?", [$pid]);
+        $pname = $p['title'] ?? 'Podcast Desconocido';
+        $detail[] = "'{$pname}' ({$cnt})";
+        if (empty($link) && !empty($p['slug'])) {
+          $link = '/admin/podcast/' . urlencode($p['slug']) . '?tab=analytics';
+        }
+      }
+    }
+    $body = implode(', ', $detail) . ": {$dlStr}. ({$dupStr}).";
+    if (count($by_podcast) > 1) {
+      $link = '/admin/analytics';
     }
   }
-  $detailStr = implode(', ', $detail);
-  $body = "{$total['inserted']} nuevas descargas registradas ({$total['duplicates']} duplicados filtrados).";
-  if ($detailStr) {
-    $body .= " Detalles: " . $detailStr . ".";
-  }
-  kp_alert('op3', 'Descargas procesadas', $body, '');
+
+  kp_alert('op3', 'Descargas procesadas', $body, $link);
 }
 
 // Detección de milestones de descargas por episodio

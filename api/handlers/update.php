@@ -98,6 +98,24 @@ switch ($action) {
     echo json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     break;
 
+  // -----------------------------------------------------------------------
+  // Estadísticas de almacenamiento de actualizaciones
+  // -----------------------------------------------------------------------
+  case 'storage_info':
+    $result = kp_update_get_storage_info();
+    echo json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    break;
+
+  // -----------------------------------------------------------------------
+  // Borrar actualizaciones descargadas (y opcionalmente rollbacks)
+  // -----------------------------------------------------------------------
+  case 'clean_downloads':
+    set_time_limit(120);
+    $includeRollbacks = !empty($_POST['include_rollbacks']) || !empty($_GET['include_rollbacks']);
+    $result = kp_update_clean_downloads($includeRollbacks);
+    echo json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    break;
+
   default:
     http_response_code(400);
     echo json_encode(['error' => 'Acción no reconocida: ' . $action]);

@@ -531,3 +531,113 @@ function kp_update_history(): array {
     return [];
   }
 }
+
+/** Obtener estadísticas de almacenamiento de actualizaciones */
+function kp_update_get_storage_info(): array {
+  $dir = kp_update_dir();
+  $info = [
+    'downloaded_count' => 0,
+    'downloaded_bytes' => 0,
+    'rollbacks_count'  => 0,
+    'rollbacks_bytes'  => 0,
+    'total_bytes'      => 0,
+    'files'            => []
+  ];
+
+  if (!is_dir($dir)) return $info;
+
+  $items = @scandir($dir) ?: [];
+  foreach ($items as $item) {
+    if ($item === '.' || $item === '..') continue;
+    $path = $dir . '/' . $item;
+
+    if (is_file($path)) {
+      $size = filesize($path) ?: 0;
+      if (preg_match('/\.zip$/i', $item)) {
+        $info['downloaded_count']++;
+        $info['downloaded_bytes'] += $size;
+        $info['files'][] = ['name' => $item, 'type' => 'zip', 'size' => $size];
+      } elseif (preg_match('/^rollback-.*\.tar\.gz$/i', $item)) {
+        $info['rollbacks_count']++;
+        $info['rollbacks_bytes'] += $size;
+        $info['files'][] = ['name' => $item, 'type' => 'rollback', 'size' => $size];
+      }
+    } elseif (is_dir($path) && str_starts_with($item, 'tmp-')) {
+      $tmpSize = kp_dir_size($path);
+      $info['downloaded_count']++;
+      $info['downloaded_bytes'] += $tmpSize;
+      $info['files'][] = ['name' => $item, 'type' => 'tmp', 'size' => $tmpSize];
+    }
+  }
+
+  $info['total_bytes'] = $info['downloaded_bytes'] + $info['rollbacks_bytes'];
+  return $info;
+}
+
+/** Calcular tamaño recursivo de un directorio */
+function kp_dir_size(string $dir): int {
+  $size = 0;
+  if (!is_dir($dir)) return 0;
+  $items = @scandir($dir) ?: [];
+  foreach ($items as $item) {
+    if ($item === '.' || $item === '..') continue;
+    $path = $dir . '/' . $item;
+    if (is_dir($path)) {
+      $size += kp_dir_size($path);
+    } else {
+      $size += filesize($path) ?: 0;
+    }
+  }
+  return $size;
+}
+
+/** Limpiar actualizaciones descargadas (archivos zip y temporales) y opcionalmente rollbacks */
+function kp_update_clean_downloads(bool $includeRollbacks = false): array {
+  $dir = kp_update_dir();
+  $deletedCount = 0;
+  $freedBytes = 0;
+
+  if (!is_dir($dir)) {
+    return ['success' => true, 'deleted_count' => 0, 'freed_bytes' => 0, 'freed_human' => human_bytes(0)];
+  }
+
+  $items = @scandir($dir) ?: [];
+  foreach ($items as $item) {
+    if ($item === '.' || $item === '..') continue;
+    $path = $dir . '/' . $item;
+
+    if (is_file($path)) {
+      $isZip = (bool)preg_match('/\.zip$/i', $item);
+      $isRollback = (bool)preg_match('/^rollback-.*\.tar\.gz$/i', $item);
+
+      if ($isZip || ($includeRollbacks && $isRollback)) {
+        $sz = filesize($path) ?: 0;
+        if (@unlink($path)) {
+          $deletedCount++;
+          $freedBytes += $sz;
+        }
+      }
+    } elseif (is_dir($path) && str_starts_with($item, 'tmp-')) {
+      $sz = kp_dir_size($path);
+      kp_update_cleanup_tmp($path);
+      $deletedCount++;
+      $freedBytes += $sz;
+    }
+  }
+
+  if ($includeRollbacks) {
+    $defaultRb = kp_setting('update_rollback_path', '');
+    if ($defaultRb && !file_exists($defaultRb)) {
+      $set = kp_db()->prepare("INSERT INTO settings (k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v");
+      $set->execute(['update_rollback_path', '']);
+      $set->execute(['update_rollback_version', '']);
+    }
+  }
+
+  return [
+    'success' => true,
+    'deleted_count' => $deletedCount,
+    'freed_bytes' => $freedBytes,
+    'freed_human' => human_bytes($freedBytes)
+  ];
+}

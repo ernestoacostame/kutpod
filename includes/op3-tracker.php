@@ -15,7 +15,13 @@ require_once __DIR__ . '/geoip2-autoload.php';
 // Esquema (autocreado)
 // ---------------------------------------------------------------------------
 function kp_op3_ensure_schema(): void {
+  static $ensured = false;
+  if ($ensured) return;
+  $ensured = true;
+
   $pdo = kp_db();
+  $has = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='op3_hits'")->fetch();
+  if ($has) return;
   $pdo->exec("CREATE TABLE IF NOT EXISTS op3_hits (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     ts           TEXT NOT NULL DEFAULT (datetime('now')),

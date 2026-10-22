@@ -70,6 +70,15 @@ function kp_get_protocol(): string {
   return 'http';
 }
 
+if (!function_exists('human_bytes')) {
+  function human_bytes($n): string {
+    if ($n === null) return '—';
+    $u = ['B','KB','MB','GB','TB']; $i = 0; $n = (float)$n;
+    while ($n >= 1024 && $i < count($u)-1) { $n /= 1024; $i++; }
+    return number_format($n, $n < 10 && $i > 0 ? 2 : 0) . ' ' . $u[$i];
+  }
+}
+
 
 function icon(string $name, int $size = 16): string {
   static $paths = null;

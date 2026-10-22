@@ -22,6 +22,11 @@ function kp_db(): PDO {
   ]);
   $pdo->exec('PRAGMA foreign_keys = ON');
   $pdo->exec('PRAGMA journal_mode = WAL');
+  $pdo->exec('PRAGMA synchronous = NORMAL');
+  $pdo->exec('PRAGMA cache_size = -32000');
+  $pdo->exec('PRAGMA temp_store = MEMORY');
+  $pdo->exec('PRAGMA mmap_size = 268435456');
+  $pdo->exec('PRAGMA busy_timeout = 5000');
 
   // Schema base si falta. Sin seed: la BD queda limpia.
   $has = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")->fetch();
@@ -37,7 +42,7 @@ function kp_db(): PDO {
     if ($stmt) {
       $row = $stmt->fetch();
       if ($row && isset($row['v'])) {
-        $current_version = (int)$row['v'];
+        $current_version = (int)trim((string)$row['v'], "'\"");
       }
     }
   } catch (Throwable $e) {
@@ -231,6 +236,22 @@ function kp_db(): PDO {
     // Guardar versión de esquema en settings
     try {
       $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '5') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
+    } catch (Throwable $e) {}
+  }
+
+  if ($current_version < 6) {
+    // Versión 6: Índices de alto rendimiento para analytics OP3, episodios y alertas
+    try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_stats_daily_ep ON op3_stats_daily(episode_id, downloads)"); } catch (Throwable $e) {}
+    try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_stats_daily_pod ON op3_stats_daily(podcast_id, date)"); } catch (Throwable $e) {}
+    try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_geo_daily_ep ON op3_geo_daily(episode_id, date)"); } catch (Throwable $e) {}
+    try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_apps_daily_ep ON op3_apps_daily(episode_id, date)"); } catch (Throwable $e) {}
+    try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_episodes_status_pub ON episodes(status, published_at DESC)"); } catch (Throwable $e) {}
+    try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_episodes_slug ON episodes(slug)"); } catch (Throwable $e) {}
+    try { $pdo->exec("CREATE INDEX IF NOT EXISTS idx_alerts_unread ON alerts(read_at)"); } catch (Throwable $e) {}
+
+    // Guardar versión de esquema en settings
+    try {
+      $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '6') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
     } catch (Throwable $e) {}
   }
   

@@ -1275,3 +1275,551 @@ textarea.block-input { resize: vertical; line-height: 1.5; }
     aspect-ratio: 1 / 1 !important;
   }
 }
+
+/* ============================================================================
+   KutPod Analytics Redesign: Tabs, Interactive Map & Enhanced Stat Bars
+   ============================================================================ */
+
+/* Tabs Navigation */
+.stats-tabs-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  margin-top: 24px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.stats-tabs-nav::-webkit-scrollbar {
+  display: none;
+}
+.stats-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  user-select: none;
+}
+.stats-tab-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+[data-theme="light"] .stats-tab-btn:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.stats-tab-btn.active {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border-strong);
+  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.35);
+  font-weight: 600;
+}
+[data-theme="light"] .stats-tab-btn.active {
+  box-shadow: 0 4px 12px -3px rgba(0, 0, 0, 0.1);
+}
+.stats-tab-btn .tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Tab Panels */
+.stats-tab-panel {
+  display: none;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.stats-tab-panel.active {
+  display: block;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Interactive Map Card & Container */
+.world-map-card {
+  position: relative;
+  overflow: hidden;
+  padding: 24px;
+}
+.world-map-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.world-map-container {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  min-height: 440px;
+  display: flex;
+  flex-direction: column;
+}
+.world-map-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  z-index: 10;
+  flex-wrap: wrap;
+}
+.world-map-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.world-map-legend .legend-gradient-bar {
+  width: 140px;
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #93c5fd, #2563eb, #172554);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.world-map-legend .legend-label {
+  font-weight: 500;
+}
+.world-map-legend .legend-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.world-map-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.map-ctrl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.map-ctrl-btn:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.map-ctrl-btn:active {
+  transform: scale(0.95);
+}
+
+.world-map-stage {
+  position: relative;
+  width: 100%;
+  height: 480px;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.world-map-stage:active {
+  cursor: grabbing;
+}
+.world-map-stage svg#world-map {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+#world-map-viewport {
+  transition: transform 0.12s ease-out;
+}
+#world-map path {
+  fill: #242430;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 0.65px;
+  stroke-linejoin: round;
+  transition: fill 0.25s ease, stroke 0.2s ease, filter 0.2s ease;
+  cursor: pointer;
+}
+[data-theme="light"] #world-map path {
+  fill: #e4e4e0;
+  stroke: rgba(0, 0, 0, 0.14);
+}
+#world-map [data-country] {
+  cursor: pointer;
+}
+#world-map [data-country]:hover,
+#world-map [data-country].is-hovered {
+  stroke: #ffffff !important;
+  stroke-width: 1.8px !important;
+  filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.7)) brightness(1.22);
+}
+[data-theme="light"] #world-map [data-country]:hover,
+[data-theme="light"] #world-map [data-country].is-hovered {
+  stroke: #0f0f14 !important;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.25)) brightness(1.1);
+}
+
+/* Floating Tooltip for World Map */
+.world-map-tooltip {
+  position: absolute;
+  pointer-events: none;
+  z-index: 100;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: rgba(22, 22, 28, 0.94);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.4;
+  min-width: 170px;
+  max-width: 260px;
+  transform: translate(-50%, -115%);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  white-space: normal;
+}
+[data-theme="light"] .world-map-tooltip {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
+}
+.world-map-tooltip .tooltip-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.world-map-tooltip .tooltip-flag {
+  font-size: 17px;
+  line-height: 1;
+}
+.world-map-tooltip .tooltip-code {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--text-2);
+  margin-left: auto;
+  letter-spacing: 0.05em;
+}
+.world-map-tooltip .tooltip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.world-map-tooltip .tooltip-downloads {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+.world-map-tooltip .tooltip-pct {
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+/* Stat Bar Items & Hover Effects */
+.stat-bar-item {
+  position: relative;
+  padding: 6px 8px;
+  margin: -3px -8px;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+  cursor: pointer;
+}
+.stat-bar-item:hover {
+  background: var(--surface-2);
+}
+.stat-bar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  margin-bottom: 5px;
+  gap: 8px;
+}
+.stat-bar-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stat-bar-title-wrap span,
+.stat-bar-title-wrap a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stat-row-badge {
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.stat-bar-numbers {
+  font-size: 12px;
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.stat-bar-numbers .stat-count {
+  font-weight: 600;
+  color: var(--text-2);
+}
+.stat-bar-item:hover .stat-bar-numbers .stat-count {
+  color: var(--accent);
+}
+.stat-bar-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+  position: relative;
+}
+[data-theme="light"] .stat-bar-track {
+  background: var(--surface-3);
+}
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.4s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+.stat-bar-item:hover .stat-bar-fill {
+  filter: brightness(1.22);
+  box-shadow: 0 0 10px var(--accent-soft);
+}
+
+/* Universal Floating Tooltip */
+.kp-universal-tooltip {
+  position: fixed;
+  pointer-events: none;
+  z-index: 10000;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(18, 18, 24, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.5);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -130%);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+[data-theme="light"] .kp-universal-tooltip {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.14);
+}
+.kp-universal-tooltip.visible {
+  opacity: 1;
+}
+
+/* Daily Chart Bars Enhancement */
+.chart-day-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  position: relative;
+  cursor: pointer;
+  padding: 0 1px;
+}
+.chart-day-bar {
+  background: var(--accent);
+  opacity: 0.85;
+  border-radius: 3px 3px 0 0;
+  transition: opacity 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+}
+.chart-day-bar-wrap:hover .chart-day-bar {
+  opacity: 1;
+  filter: brightness(1.25);
+  transform: scaleY(1.03);
+  transform-origin: bottom;
+  box-shadow: 0 0 10px var(--accent-soft);
+}
+
+/* Card Pagination & Expand Controls */
+.kp-paginated-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-3);
+  flex-wrap: wrap;
+}
+.kp-pager-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kp-pager-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.kp-pager-btn:hover:not(:disabled) {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+.kp-pager-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.kp-pager-toggle-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.kp-pager-toggle-btn:hover {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+/* Multi-column layout for analytics cards (eliminates vertical gaps and optimizes space) */
+.stats-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+.stats-col {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+.stats-col > .card {
+  height: fit-content;
+  box-sizing: border-box;
+}
+
+@media (max-width: 920px) {
+  .stats-two-col {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .stats-col {
+    gap: 16px;
+  }
+}
+
+/* Overview Line Chart & Donut Chart enhancements */
+.chart-point-hit {
+  cursor: pointer;
+}
+.chart-point-hit:hover .chart-point-dot {
+  r: 7;
+  stroke-width: 3.5;
+  filter: drop-shadow(0 0 6px currentColor);
+}
+.donut-slice {
+  cursor: pointer;
+  transform-origin: 90px 90px;
+  transition: stroke-width 0.2s ease, opacity 0.2s ease, filter 0.2s ease;
+}
+.donut-slice:hover,
+.donut-slice.is-active {
+  stroke-width: 24;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+.donut-legend-row {
+  transition: background 0.15s ease;
+}
+.donut-legend-row:hover,
+.donut-legend-row.is-active {
+  background: var(--surface-2);
+}
+
+/* 3-column layout for Overview cards under full-width chart */
+.overview-three-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--gap);
+  align-items: start;
+}
+@media (max-width: 1080px) {
+  .overview-three-col {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+
+
+

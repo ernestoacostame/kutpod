@@ -16,6 +16,9 @@ $hasRollback = $rollbackVersion && $rollbackPath && file_exists($rollbackPath);
 $rollbacks = kp_update_get_available_rollbacks();
 $hasAnyRollback = !empty($rollbacks);
 
+// Información de almacenamiento de actualizaciones
+$storageInfo = kp_update_get_storage_info();
+
 // Historial de actualizaciones
 $history = [];
 try {
@@ -132,10 +135,51 @@ try {
 </div>
 <?php endif; ?>
 
+<!-- Almacenamiento y limpieza de actualizaciones -->
+<div class="card card-lg" style="padding:24px;margin-top:24px" id="card-clean-updates">
+  <div class="card-head" style="align-items:flex-start;flex-wrap:wrap;gap:16px">
+    <div style="flex:1;min-width:260px">
+      <div class="card-title"><?= icon('trash', 16) ?> Paquetes de actualización descargados</div>
+      <div style="font-size:12.5px;color:var(--text-3);margin-top:4px">
+        Libera espacio en disco eliminando los paquetes de actualización descargados (.zip) y carpetas temporales.
+      </div>
+      <div style="margin-top:12px;display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--text-2)">
+        <div>
+          <span style="color:var(--text-3)">Paquetes descargados:</span>
+          <strong id="storage-dl-text"><?= $storageInfo['downloaded_count'] ?> (<?= human_bytes($storageInfo['downloaded_bytes']) ?>)</strong>
+        </div>
+        <div>
+          <span style="color:var(--text-3)">Copias de rollback:</span>
+          <strong id="storage-rb-text"><?= $storageInfo['rollbacks_count'] ?> (<?= human_bytes($storageInfo['rollbacks_bytes']) ?>)</strong>
+        </div>
+        <div>
+          <span style="color:var(--text-3)">Espacio total ocupado:</span>
+          <strong id="storage-total-text"><?= human_bytes($storageInfo['total_bytes']) ?></strong>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-2);cursor:pointer">
+          <input type="checkbox" id="clean-include-rollbacks" style="cursor:pointer">
+          Incluir también las copias de seguridad de versiones anteriores (rollback)
+        </label>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:4px">
+      <button class="btn" id="btn-clean-downloads" type="button" onclick="kpCleanDownloads()" style="color:#ef4444;border-color:#ef444455;display:inline-flex;align-items:center;gap:6px">
+        <?= icon('trash',13) ?> Borrar actualizaciones descargadas
+      </button>
+    </div>
+  </div>
+  <div id="clean-status" style="display:none;margin-top:14px"></div>
+</div>
+
 <!-- Historial -->
 <div class="card card-lg" style="padding:0;margin-top:24px">
-  <div class="card-head" style="padding:20px 24px">
+  <div class="card-head" style="padding:20px 24px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
     <div class="card-title">Historial de actualizaciones</div>
+    <button class="btn btn-ghost" type="button" onclick="kpCleanDownloads()" style="font-size:12px;color:var(--text-2);padding:6px 12px;display:inline-flex;align-items:center;gap:6px">
+      <?= icon('trash', 12) ?> Borrar actualizaciones descargadas
+    </button>
   </div>
   <?php if (!$history): ?>
     <div style="padding:48px;text-align:center;color:var(--text-3)">
@@ -340,6 +384,79 @@ function kpUpdateRollback() {
     .catch(e => {
       status.innerHTML = '<div style="padding:14px;color:#ef4444;font-size:13.5px">❌ Error: ' + e.message + '</div>';
       btn.disabled = false;
+    });
+}
+
+function humanBytesJs(bytes) {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function kpCleanDownloads() {
+  const includeRollbacks = document.getElementById('clean-include-rollbacks')?.checked || false;
+  const promptMsg = includeRollbacks
+    ? '¿Deseas eliminar las actualizaciones descargadas (.zip) Y también todas las copias de seguridad de versiones anteriores?'
+    : '¿Deseas eliminar los paquetes de actualizaciones descargados (.zip) y archivos temporales?';
+
+  if (!confirm(promptMsg)) return;
+
+  const btn = document.getElementById('btn-clean-downloads');
+  const status = document.getElementById('clean-status');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<?= icon('refreshCw',13) ?> Borrando...';
+  }
+  if (status) {
+    status.style.display = 'block';
+    status.innerHTML = '<div style="padding:10px;color:var(--text-3);font-size:13px">Eliminando archivos...</div>';
+  }
+
+  const body = new URLSearchParams({
+    action: 'clean_downloads',
+    include_rollbacks: includeRollbacks ? '1' : '0'
+  });
+
+  fetch('/api/update', { method: 'POST', body })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        if (status) status.innerHTML = '<div style="padding:10px;color:#ef4444;font-size:13px;background:#ef444415;border-radius:8px">❌ ' + data.error + '</div>';
+        else alert('Error: ' + data.error);
+        return;
+      }
+      const msg = 'Limpieza completada: ' + data.deleted_count + ' archivo(s) eliminados (' + data.freed_human + ' liberados).';
+      if (status) {
+        status.innerHTML = '<div style="padding:10px;color:#10b981;font-size:13px;background:#10b98115;border-radius:8px">✅ ' + msg + '</div>';
+      } else {
+        alert(msg);
+      }
+      
+      // Actualizar información de almacenamiento
+      fetch('/api/update?action=storage_info')
+        .then(r => r.json())
+        .then(info => {
+          if (info && !info.error) {
+            const dl = document.getElementById('storage-dl-text');
+            const rb = document.getElementById('storage-rb-text');
+            const tot = document.getElementById('storage-total-text');
+            if (dl) dl.textContent = info.downloaded_count + ' (' + humanBytesJs(info.downloaded_bytes) + ')';
+            if (rb) rb.textContent = info.rollbacks_count + ' (' + humanBytesJs(info.rollbacks_bytes) + ')';
+            if (tot) tot.textContent = humanBytesJs(info.total_bytes);
+          }
+        }).catch(() => {});
+    })
+    .catch(e => {
+      if (status) status.innerHTML = '<div style="padding:10px;color:#ef4444;font-size:13px;background:#ef444415;border-radius:8px">❌ Error: ' + e.message + '</div>';
+      else alert('Error: ' + e.message);
+    })
+    .finally(() => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<?= icon('trash',13) ?> Borrar actualizaciones descargadas';
+      }
     });
 }
 </script>

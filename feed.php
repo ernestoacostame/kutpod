@@ -155,7 +155,7 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
     <title><?= e(xml_sanitize($e['title'])) ?></title>
     <guid isPermaLink="false"><?= e(xml_sanitize($e['guid'])) ?></guid>
     <link><?= e($base) ?>/@<?= e($p['slug']) ?>/<?= e($e['slug']) ?></link>
-    <pubDate><?= e(date(DATE_RSS, kp_db_strtotime($e['published_at'] ?? $e['created_at']))) ?></pubDate>
+    <pubDate><?= e(date(DATE_RSS, kp_db_strtotime($e['published_at'] ?? ($e['publish_at'] ?? ($e['created_at'] ?? null))))) ?></pubDate>
     <description><?= e(xml_sanitize(strip_tags(kp_md_to_html($e['notes_md'] ?? '')))) ?></description>
     <itunes:summary><?= e(xml_sanitize(strip_tags(kp_md_to_html($e['notes_md'] ?? '')))) ?></itunes:summary>
     <?php

@@ -1811,12 +1811,16 @@ textarea.block-input { resize: vertical; line-height: 1.5; }
   display: grid;
   grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--gap);
+  align-items: stretch;
+}
+.overview-three-col.is-expanded {
   align-items: start;
 }
 @media (max-width: 1080px) {
   .overview-three-col {
     grid-template-columns: 1fr;
     gap: 16px;
+    align-items: start;
   }
 }
 

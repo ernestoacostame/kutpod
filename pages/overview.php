@@ -195,12 +195,12 @@ try {
 <!-- TARJETAS EN 3 COLUMNAS COMPACTAS -->
 <div class="overview-three-col" style="margin-top:var(--gap)">
   <!-- COLUMNA 1: Tus podcasts (Paginado a Top 4) -->
-  <div class="card kp-paginated-card" data-page-size="4">
+  <div class="card kp-paginated-card" data-page-size="4" style="display:flex;flex-direction:column;height:100%">
     <div class="card-head">
       <div class="card-title">Tus podcasts</div>
       <a class="btn btn-ghost" href="/admin/podcasts">Ver todos →</a>
     </div>
-    <div class="kp-paginated-items list">
+    <div class="kp-paginated-items list" style="flex:1">
       <?php
         $top_episodes_map = kp_op3_most_downloaded_episodes_by_podcast();
         foreach ($podcasts as $p):
@@ -240,7 +240,7 @@ try {
     </div>
   </div>
 
-  <!-- COLUMNA 2: Distribución por show (Donut chart: Top 3 + Otros shows) -->
+  <!-- COLUMNA 2: Distribución por show (Donut chart: Top 4 + Otros shows) -->
   <?php
     $donut_total = array_sum($podcast_period_totals);
     $donut_items = [];
@@ -261,7 +261,7 @@ try {
     $other_dl = 0;
     foreach ($donut_items as $idx => $di) {
       if ($donut_total > 0 && $di['downloads'] > 0) {
-        if ($idx < 3) { // SOLO LOS 3 PRIMEROS SHOWS
+        if ($idx < 4) { // Top 4 shows
           $slices[] = [
             'title' => $di['title'],
             'color' => $di['color'],
@@ -282,13 +282,13 @@ try {
       ];
     }
   ?>
-  <div class="card">
+  <div class="card" style="display:flex;flex-direction:column;height:100%">
     <div class="card-head" style="margin-bottom:12px">
       <div class="card-title">Distribución por show</div>
       <span style="font-size:11px;color:var(--text-3);background:var(--surface-2);border:1px solid var(--border);padding:2px 8px;border-radius:12px"><?= $period==365 ? '12 meses' : $period.' días' ?></span>
     </div>
 
-    <div style="position:relative;display:flex;justify-content:center;align-items:center;padding:8px 0">
+    <div style="position:relative;display:flex;justify-content:center;align-items:center;padding:12px 0;flex:1">
       <svg viewBox="0 0 160 160" style="width:160px;height:160px;overflow:visible">
         <!-- Fondo base del donut -->
         <circle cx="80" cy="80" r="56" fill="none" stroke="var(--surface-2)" stroke-width="18" />
@@ -324,7 +324,7 @@ try {
     </div>
 
     <?php if (!empty($slices)): ?>
-      <div class="col" style="gap:6px;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+      <div class="col" style="gap:6px;margin-top:auto;border-top:1px solid var(--border);padding-top:12px">
         <?php foreach ($slices as $sIdx => $sl):
           $tip_legend = '<div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:'.e($sl['color']).'"></span><strong style="color:var(--text)">'.e($sl['title']).'</strong></div><div style="font-size:13px;font-weight:600;margin-top:4px;color:var(--text)">'.number_format($sl['downloads']).' descargas ('.$sl['pct'].'%)</div>';
         ?>
@@ -344,49 +344,55 @@ try {
   </div>
 
   <!-- COLUMNA 3: Ritmo de publicación + Top show · 7d apilados -->
-  <div class="col" style="gap:var(--gap)">
+  <div class="col" style="gap:var(--gap);display:flex;flex-direction:column;height:100%">
     <!-- Ritmo de publicación -->
-    <div class="card">
-      <div class="card-head"><div class="card-title">Ritmo de publicación</div></div>
-      <?php if ($rhythm_days === null): ?>
-        <div class="page-sub" style="padding:20px 0;text-align:center">Necesitas al menos 2 episodios publicados para medir el ritmo.</div>
-      <?php else: ?>
-        <div class="tabular" style="font-size:30px;font-weight:600;letter-spacing:-0.02em">
-          <?= number_format($rhythm_days, 1) ?><span style="font-size:13.5px;color:var(--text-3);font-weight:400;margin-left:6px">días entre eps</span>
-        </div>
-        <div class="delta <?= $rhythm_days <= $meta ? 'up' : 'down' ?>" style="margin-top:6px">
-          <?= icon($rhythm_days <= $meta ? 'arrowDown' : 'arrowUp',12) ?>
-          <?= number_format(abs($meta - $rhythm_days), 1) ?>d vs meta de <?= $meta ?>d
-        </div>
+    <div class="card" style="flex:1;display:flex;flex-direction:column;justify-content:space-between">
+      <div>
+        <div class="card-head"><div class="card-title">Ritmo de publicación</div></div>
+        <?php if ($rhythm_days === null): ?>
+          <div class="page-sub" style="padding:20px 0;text-align:center">Necesitas al menos 2 episodios publicados para medir el ritmo.</div>
+        <?php else: ?>
+          <div class="tabular" style="font-size:30px;font-weight:600;letter-spacing:-0.02em">
+            <?= number_format($rhythm_days, 1) ?><span style="font-size:13.5px;color:var(--text-3);font-weight:400;margin-left:6px">días entre eps</span>
+          </div>
+          <div class="delta <?= $rhythm_days <= $meta ? 'up' : 'down' ?>" style="margin-top:6px">
+            <?= icon($rhythm_days <= $meta ? 'arrowDown' : 'arrowUp',12) ?>
+            <?= number_format(abs($meta - $rhythm_days), 1) ?>d vs meta de <?= $meta ?>d
+          </div>
+        <?php endif; ?>
+      </div>
+      <?php if ($rhythm_days !== null): ?>
         <div class="row" style="justify-content:space-between;margin-top:14px;font-size:11px;color:var(--text-3)"><span>últimos episodios</span><span><?= e($episodes[0]['date'] ?? '') ?></span></div>
       <?php endif; ?>
     </div>
 
     <!-- Top show · 7d -->
     <?php if ($topShow): ?>
-    <div class="card">
-      <div class="card-head"><div class="card-title">Top show · 7d</div></div>
-      <div class="row" style="gap:14px;align-items:flex-start">
-        <?php if ($topShow['cover']): ?>
-          <img class="cover" src="<?= e($topShow['cover']) ?>" style="width:64px;height:64px;border-radius:12px;object-fit:cover;flex-shrink:0" alt="">
-        <?php else: ?>
-          <div class="cover" style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,<?= e($topShow['color']) ?>,<?= e($topShow['color']) ?>99);color:white;font-weight:700;font-size:18px;flex-shrink:0"><?= e($topShow['initial']) ?></div>
-        <?php endif; ?>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:600">
-            <?= e($topShow['title']) ?>
-            <?php if (($topShow['parental'] ?? 'clean') === 'explicit'): ?>
-              <span style="display:inline-block;background:var(--border);color:var(--text-2);border-radius:4px;font-size:10px;padding:2px 4px;margin-left:4px;vertical-align:middle;line-height:1;font-weight:800">E</span>
-            <?php endif; ?>
-          </div>
-          <div style="font-size:12px;color:var(--text-3);margin-top:2px"><?= (int)$topShow['episodes'] ?> eps · <?= e($topShow['cat']) ?></div>
-          <div class="row" style="gap:16px;margin-top:12px">
-            <div><div style="font-size:11px;color:var(--text-3)">7d</div><div class="tabular" style="font-weight:600"><?= fmt_num((int)$topShow['downloads7']) ?></div></div>
-            <div><div style="font-size:11px;color:var(--text-3)">Total</div><div class="tabular" style="font-weight:600"><?= fmt_num((int)$topShow['downloads']) ?></div></div>
+    <div class="card" style="flex:1;display:flex;flex-direction:column;justify-content:space-between">
+      <div>
+        <div class="card-head"><div class="card-title">Top show · 7d</div></div>
+        <div class="row" style="gap:14px;align-items:flex-start">
+          <?php if ($topShow['cover']): ?>
+            <img class="cover" src="<?= e($topShow['cover']) ?>" style="width:64px;height:64px;border-radius:12px;object-fit:cover;flex-shrink:0" alt="">
+          <?php else: ?>
+            <div class="cover" style="width:64px;height:64px;border-radius:12px;background:linear-gradient(135deg,<?= e($topShow['color']) ?>,<?= e($topShow['color']) ?>99);color:white;font-weight:700;font-size:18px;flex-shrink:0"><?= e($topShow['initial']) ?></div>
+          <?php endif; ?>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:600">
+              <?= e($topShow['title']) ?>
+              <?php if (($topShow['parental'] ?? 'clean') === 'explicit'): ?>
+                <span style="display:inline-block;background:var(--border);color:var(--text-2);border-radius:4px;font-size:10px;padding:2px 4px;margin-left:4px;vertical-align:middle;line-height:1;font-weight:800">E</span>
+              <?php endif; ?>
+            </div>
+            <div style="font-size:12px;color:var(--text-3);margin-top:2px"><?= (int)$topShow['episodes'] ?> eps · <?= e($topShow['cat']) ?></div>
+            <div class="row" style="gap:16px;margin-top:12px">
+              <div><div style="font-size:11px;color:var(--text-3)">7d</div><div class="tabular" style="font-weight:600"><?= fmt_num((int)$topShow['downloads7']) ?></div></div>
+              <div><div style="font-size:11px;color:var(--text-3)">Total</div><div class="tabular" style="font-weight:600"><?= fmt_num((int)$topShow['downloads']) ?></div></div>
+            </div>
           </div>
         </div>
       </div>
-      <a class="btn" style="margin-top:12px;width:100%;justify-content:center" href="/admin/podcast/<?= e($topShow['id']) ?>">Abrir show →</a>
+      <a class="btn" style="margin-top:14px;width:100%;justify-content:center" href="/admin/podcast/<?= e($topShow['id']) ?>">Abrir show →</a>
     </div>
     <?php endif; ?>
   </div>
@@ -532,7 +538,9 @@ try {
     const pagesSpan = footer.querySelector('.kp-pager-pages');
 
     function updateView() {
+      const parentGrid = card.closest('.overview-three-col');
       if (showAll) {
+        if (parentGrid) parentGrid.classList.add('is-expanded');
         items.forEach(el => el.style.display = '');
         infoEl.textContent = `Mostrando todos (${total})`;
         toggleBtn.textContent = 'Ver top ' + pageSize;
@@ -540,6 +548,7 @@ try {
         nextBtn.style.display = 'none';
         pagesSpan.style.display = 'none';
       } else {
+        if (parentGrid) parentGrid.classList.remove('is-expanded');
         prevBtn.style.display = '';
         nextBtn.style.display = '';
         pagesSpan.style.display = '';

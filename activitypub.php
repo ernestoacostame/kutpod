@@ -332,7 +332,7 @@ function kp_ap_publish_episode(int $episodeId, bool $resend = false): void {
     'attributedTo' => $actor,
     'to' => ['https://www.w3.org/ns/activitystreams#Public'],
     'cc' => ["$actor/followers"],
-    'published' => gmdate('Y-m-d\TH:i:s\Z', strtotime($e['published_at'] ?: 'now')),
+    'published' => gmdate('Y-m-d\TH:i:s\Z', strtotime($e['published_at'] ?: ($e['publish_at'] ?: ($e['created_at'] ?? 'now')))),
     'url' => "$base/@{$p['slug']}/{$e['slug']}",
     'content' => "<p><strong>" . htmlspecialchars($e['title']) . "</strong></p>"
                  . $notes_html

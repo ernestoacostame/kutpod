@@ -254,6 +254,18 @@ function kp_db(): PDO {
       $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '6') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
     } catch (Throwable $e) {}
   }
+
+  if ($current_version < 7) {
+    // Versión 7: Sincronizar published_at en episodios publicados que tienen published_at NULL o vacío
+    try {
+      $pdo->exec("UPDATE episodes SET published_at = COALESCE(publish_at, created_at, datetime('now')) WHERE status = 'published' AND (published_at IS NULL OR published_at = '')");
+    } catch (Throwable $e) {}
+
+    // Guardar versión de esquema en settings
+    try {
+      $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '7') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
+    } catch (Throwable $e) {}
+  }
   
   return $pdo;
 }

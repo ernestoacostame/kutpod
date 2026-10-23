@@ -193,13 +193,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
   $was_published = false;
   if ($ep) {
-      $pdo->prepare("UPDATE episodes SET title=?, slug=?, notes_md=?, season=?, number=?, ep_type=?, status=?, transcript_url=?, chapters_url=?, audio_url=?, audio_bytes=?, duration_secs=?, cover=?, publish_at=?, persons_json=?, premium=?, updated_at=datetime('now') WHERE id=?")
-          ->execute([$title, $slug, $notes_md, $season, $number, $ep_type, $status, $transcript_url, $chapters_url, $audio_url, $audio_bytes, $duration_secs, $cover_url, $publish_at, $persons_json, $premium, $ep['id']]);
+      $published_at = $ep['published_at'] ?? null;
+      if ($status === 'published' && empty($published_at)) {
+          $published_at = $publish_at ?: gmdate('Y-m-d H:i:s');
+      }
+      $pdo->prepare("UPDATE episodes SET title=?, slug=?, notes_md=?, season=?, number=?, ep_type=?, status=?, transcript_url=?, chapters_url=?, audio_url=?, audio_bytes=?, duration_secs=?, cover=?, publish_at=?, published_at=?, persons_json=?, premium=?, updated_at=datetime('now') WHERE id=?")
+          ->execute([$title, $slug, $notes_md, $season, $number, $ep_type, $status, $transcript_url, $chapters_url, $audio_url, $audio_bytes, $duration_secs, $cover_url, $publish_at, $published_at, $persons_json, $premium, $ep['id']]);
       $episode_id = $ep['id'];
       $was_published = $ep['status'] === 'published';
   } else {
-      $pdo->prepare("INSERT INTO episodes (podcast_id, guid, title, slug, notes_md, season, number, ep_type, status, transcript_url, chapters_url, audio_url, audio_bytes, duration_secs, cover, publish_at, persons_json, premium) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          ->execute([$real_podcast_id, bin2hex(random_bytes(8)), $title, $slug, $notes_md, $season, $number, $ep_type, $status, $transcript_url, $chapters_url, $audio_url, $audio_bytes, $duration_secs, $cover_url, $publish_at, $persons_json, $premium]);
+      $published_at = ($status === 'published') ? ($publish_at ?: gmdate('Y-m-d H:i:s')) : null;
+      $pdo->prepare("INSERT INTO episodes (podcast_id, guid, title, slug, notes_md, season, number, ep_type, status, transcript_url, chapters_url, audio_url, audio_bytes, duration_secs, cover, publish_at, published_at, persons_json, premium) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          ->execute([$real_podcast_id, bin2hex(random_bytes(8)), $title, $slug, $notes_md, $season, $number, $ep_type, $status, $transcript_url, $chapters_url, $audio_url, $audio_bytes, $duration_secs, $cover_url, $publish_at, $published_at, $persons_json, $premium]);
       $episode_id = (int)$pdo->lastInsertId();
   }
 

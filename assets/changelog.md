@@ -55,10 +55,11 @@ Tecnología:
 
 6. Reorganización de la Pantalla Overview / Resume y Nuevo Gráfico Donut
 - **Gráfico principal a todo el ancho**: La tarjeta de **Descargas por show** ahora abarca el 100% del ancho del grid para ofrecer una visualización amplia y detallada de la línea temporal de descargas.
-- **Distribución en 3 columnas en escritorio (`overview-three-col`)**: Justo debajo del gráfico grande, las tarjetas se organizan en 3 columnas paralelas perfectamente equilibradas en altura:
-    - **Columna 1**: **Tus podcasts** con columna ampliada (`1.35fr`) y paginador ajustado a **Top 4 por página** (con navegación `‹ 1/X ›` y alternador "Ver todos / Ver top 4"), dando más holgura para títulos y episodios y eliminando por completo el hueco inferior respecto a las columnas vecinas.
-    - **Columna 2**: **Distribución por show (Gráfico Donut)** en columna compacta (`1fr`), configurado para mostrar los **3 primeros shows** más escuchados y agrupar el resto en **"Otros shows"**, garantizando una leyenda limpia de 4 filas.
-    - **Columna 3**: Tarjetas apiladas de **Ritmo de publicación** (métricas de cadencia) y **Top show · 7d** en columna compacta (`1fr`).
+- **Distribución en 3 columnas en escritorio (`overview-three-col`) con altura 100% nivelada**: Justo debajo del gráfico grande, las tarjetas se organizan en 3 columnas paralelas con alineación estirada (`align-items: stretch`) eliminando cualquier hueco o desnivel inferior:
+    - **Columna 1**: **Tus podcasts** con columna ampliada (`1.35fr`), paginador ajustado a **Top 4 por página** (con navegación `‹ 1/X ›` y alternador "Ver todos / Ver top 4"), contenedor flexible y pie de paginación anclado al fondo.
+    - **Columna 2**: **Distribución por show (Gráfico Donut)** en columna compacta (`1fr`), configurado para mostrar los **4 primeros shows** más escuchados más **"Otros shows"**, con leyenda anclada al fondo y gráfico centrado verticalmente.
+    - **Columna 3**: Tarjetas apiladas de **Ritmo de publicación** y **Top show · 7d** en columna compacta (`1fr`), ambas con distribución vertical proporcional para concluir exactamente en la misma línea base horizontal que las dos columnas anteriores.
+    - **Desacoplamiento inteligente en expansión**: Al pulsar "Ver todos" en Tus podcasts, se conmuta dinámicamente el grid a alineación superior para desplegar toda la colección de podcasts sin estirar innecesariamente las columnas laterales.
 - **Puntos interactivos dinámicos en el gráfico de líneas**: Se sustituyeron los tooltips nativos del navegador por tooltips flotantes dinámicos (`data-tooltip-html`) con animación de escala, brillo y sombra del color del show, indicando instantáneamente el podcast, fecha y descargas sin demoras.
 - **Gráfico Donut de distribución de escuchas por podcast**:
     - Calcula la cuota de descargas de cada show en el período activo (7d, 30d, 12 meses).
@@ -98,3 +99,15 @@ Tecnología:
     - Se optimizó `kp_op3_ensure_schema()` con verificación estática y chequeo de existencia, evitando la ejecución reiterada de 11 sentencias DDL en cada descarga o reproducción de audio.
 - **Recolección de basura mejorada en `cleanup.php`**:
     - Se añadió la purga programada de hits procesados en `op3_hits` con más de 90 días de antigüedad (`processed = 1 AND ts < datetime('now', '-90 days')`), reduciendo decenas de megabytes de espacio innecesario en disco tras la ejecución de VACUUM.
+
+9. Corrección en Fechas y Sincronización de Episodios Federados (ActivityPub)
+- **Sincronización y orden de últimos episodios federados**:
+    - Se corrigió la consulta de "Últimos episodios federados" en `/admin/fediverse` para ordenar mediante `COALESCE(e.published_at, e.publish_at, e.created_at) DESC`, solucionando el problema donde los episodios recién publicados no aparecían o se mostraban con fechas antiguas de meses atrás debido a que `published_at` se encontraba en `NULL`.
+    - La etiqueta de tiempo relativo ("hace X min / h / d") ahora utiliza la fecha resuelta con fallback asegurando que el tiempo transcurrido sea exacto.
+- **Persistencia consistente de `published_at`**:
+    - Al crear o editar episodios tanto desde la interfaz web (`pages/new-episode.php`) como desde la API de Kut Editor (`api/handlers/episode_create.php` y `api/handlers/episode_update.php`), la columna `published_at` se rellena y persiste formalmente cada vez que el estado del episodio es o pasa a `published`.
+    - En el verificador de episodios programados (`data.php`), al cambiar el estado de `scheduled` a `published`, se actualiza de inmediato el campo `published_at`.
+- **Auto-migración de esquema v7**:
+    - Se integró la migración automática de esquema v7 en `includes/db.php` para actualizar retroactivamente en la base de datos de producción todos los episodios ya publicados que tenían `published_at` en `NULL`, asignándoles `publish_at` o `created_at`.
+- **Robustez en ActivityPub y RSS**:
+    - Se incorporaron fallbacks consistentes a `publish_at` y `created_at` tanto al generar la fecha del objeto Note de ActivityPub en `activitypub.php` como en la etiqueta `<pubDate>` de `feed.php`.

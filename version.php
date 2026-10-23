@@ -5,4 +5,4 @@
 // Este fichero es actualizado automáticamente por el sistema de actualizaciones.
 // No modificar manualmente.
 
-define('KUTPOD_VERSION', '1.1.2');
+define('KUTPOD_VERSION', '1.1.10');

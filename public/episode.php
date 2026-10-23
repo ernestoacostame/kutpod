@@ -54,185 +54,230 @@ if (!empty($og_image)) {
     $og_jsonld['image'] = $img_url;
 }
 ?>
-<section class="pub-section"><div class="pub-container" style="max-width:820px">
-  <a class="pub-link" href="/@<?= e($p['id']) ?>" style="margin-bottom:24px;display:inline-block">← <?= e($p['title']) ?></a>
-  <?php
-    $ep_cover = $ep['cover'] ?: ($p['cover'] ?? '');
-  ?>
-  <div class="pub-ep-layout">
-    <?php if ($ep_cover): ?>
-    <img src="<?= e($ep_cover) ?>" alt="<?= e($ep['title']) ?>" class="pub-ep-layout-cover">
-    <?php else: ?>
-    <div class="pub-ep-layout-cover pub-ep-layout-cover-placeholder" style="background:linear-gradient(135deg,<?= e($p['color']) ?>,<?= e($p['color']) ?>88);">
-      <span style="color:rgba(255,255,255,0.35);font-weight:800;font-size:60px;letter-spacing:-0.04em"><?= e($p['initial']) ?></span>
-    </div>
-    <?php endif; ?>
-    <div class="pub-ep-layout-info">
-      <div class="pub-eyebrow" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
-        <span><?= e($p['title']) ?></span>
-        <span style="opacity:0.5">·</span>
-        <?php if (($ep['type'] ?? '') === 'trailer'): ?>
-          <span class="badge-promo">Trailer</span>
-        <?php elseif (($ep['type'] ?? '') === 'bonus'): ?>
-          <span class="badge-extra">Bonus</span>
+<?php
+$ep_cover = $ep['cover'] ?: ($p['cover'] ?? '');
+
+// Load chapters if available
+$chapters = [];
+if (!empty($ep['chapters_url']) && file_exists(__DIR__ . '/..' . $ep['chapters_url'])) {
+    $chapsData = json_decode(file_get_contents(__DIR__ . '/..' . $ep['chapters_url']), true);
+    if (!empty($chapsData['chapters'])) {
+        $chapters = $chapsData['chapters'];
+    }
+}
+$fixed_notes = trim($p['fixed_notes'] ?? '');
+?>
+<section class="pub-section"><div class="pub-container pub-ep-view-container">
+  <div class="pub-ep-detail-grid">
+    <!-- Fila 1 - Izquierda: Cover con Reflejo -->
+    <div class="pub-ep-grid-hero-cover">
+      <div class="pub-ep-cover-reflection-wrap">
+        <?php if ($ep_cover): ?>
+          <img src="<?= e($ep_cover) ?>" alt="<?= e($ep['title']) ?>" class="pub-ep-cover-main">
+          <div class="pub-ep-cover-reflection" aria-hidden="true">
+            <img src="<?= e($ep_cover) ?>" alt="" class="pub-ep-cover-reflected-img">
+            <div class="pub-ep-cover-reflection-fade"></div>
+          </div>
         <?php else: ?>
-          <?php if ((int)($ep['s'] ?? 1) === 0): ?>
-            <span class="badge-number">Episodio <?= (int)$ep['n'] ?></span>
-          <?php else: ?>
-            <span class="badge-number">S<?= (int)$ep['s'] ?> · E<?= (int)$ep['n'] ?></span>
-          <?php endif; ?>
+          <div class="pub-ep-cover-main pub-ep-cover-placeholder" style="background:linear-gradient(135deg,<?= e($p['color']) ?>,<?= e($p['color']) ?>88);">
+            <span style="color:rgba(255,255,255,0.35);font-weight:800;font-size:60px;letter-spacing:-0.04em"><?= e($p['initial']) ?></span>
+          </div>
+          <div class="pub-ep-cover-reflection" aria-hidden="true">
+            <div class="pub-ep-cover-reflected-img pub-ep-cover-placeholder" style="background:linear-gradient(135deg,<?= e($p['color']) ?>,<?= e($p['color']) ?>88);">
+              <span style="color:rgba(255,255,255,0.35);font-weight:800;font-size:60px;letter-spacing:-0.04em"><?= e($p['initial']) ?></span>
+            </div>
+            <div class="pub-ep-cover-reflection-fade"></div>
+          </div>
         <?php endif; ?>
       </div>
-      <h1 class="pub-h1" style="margin-bottom:14px;font-size:1.6em;display:inline-flex;align-items:center;flex-wrap:wrap;gap:6px">
+    </div>
+
+    <!-- Fila 1 - Derecha: Título, Player y Compartir -->
+    <div class="pub-ep-grid-hero-info">
+      <a href="/@<?= e($p['id']) ?>" class="pub-ep-detail-show-tag" style="color:<?= e($p['color']) ?>">
+        <?= e($p['title']) ?>
+      </a>
+
+      <h1 class="pub-ep-detail-title">
         <?= e($ep['title']) ?>
         <?php if (($p['parental'] ?? 'clean') === 'explicit'): ?>
-          <span style="display:inline-block;background:var(--border);color:var(--text-2);border-radius:4px;font-size:12px;padding:2px 6px;line-height:1;font-weight:800">E</span>
+          <span class="pub-badge-e" title="Contenido explícito" style="vertical-align:middle;margin-left:8px">E</span>
         <?php endif; ?>
         <?php if ((int)kp_get_podcast_meta($p, 'premium_enabled', 0) || (int)kp_get_episode_meta($ep, 'premium_enabled', 0)): ?>
-          <span style="display:inline-block;background:#10b981;color:#fff;border-radius:4px;font-size:12px;padding:2px 6px;line-height:1;font-weight:800">$</span>
+          <span class="pub-badge-prem" title="Contenido premium" style="vertical-align:middle;margin-left:4px">$</span>
         <?php endif; ?>
       </h1>
-      <div class="row" style="gap:18px;font-size:13.5px;color:var(--pub-muted);margin-bottom:20px">
-        <span><?= e($ep['duration']) ?></span><span>·</span><span title="" data-kp-date="<?= e($ep['date_iso']) ?>">Publicado hace: <?= kp_relative_time($ep['date_iso']) ?></span>
-      </div>
-      <?php
-      ob_start();
-      ?>
-      <div class="pub-ep-layout-play">
-        <button class="pub-ep-play-circle" style="background:<?= e($p['color']) ?>;width:48px;height:48px;border-radius:50%;color:white;display:grid;place-items:center;cursor:pointer;border:none;box-shadow:0 4px 12px <?= e($p['color']) ?>66;transition:transform 0.2s"
-                data-kp-play data-src="/r/<?= urlencode($p['id']) ?>/<?= urlencode($ep['id']) ?>/audio.mp3"
-                data-title="<?= e($ep['title']) ?>" data-podcast="<?= e($p['title']) ?>"
-                data-color="<?= e($p['color']) ?>" data-initial="<?= e($p['initial']) ?>"
-                data-cover="<?= e($ep['cover'] ?: ($p['cover'] ?? '')) ?>"
-                onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
-          <?= icon('play',20) ?>
-        </button>
-        <div>
-          <div style="font-size:14px;font-weight:600;color:var(--pub-text)">
-            <?= (($ep['type'] ?? '') === 'trailer') ? 'Previsualización' : ((($ep['type'] ?? '') === 'bonus') ? 'Escuchar bonus' : 'Escuchar episodio') ?>
+
+      <div class="pub-ep-detail-control-bar">
+        <div class="pub-ep-detail-play-row">
+          <?php
+          ob_start();
+          ?>
+          <button class="pub-ep-play-pill" style="background:<?= e($p['color']) ?>;color:#fff" aria-label="Reproducir <?= e($ep['title']) ?>"
+                  data-kp-play data-src="/r/<?= urlencode($p['id']) ?>/<?= urlencode($ep['id']) ?>/audio.mp3"
+                  data-title="<?= e($ep['title']) ?>" data-podcast="<?= e($p['title']) ?>"
+                  data-color="<?= e($p['color']) ?>" data-initial="<?= e($p['initial']) ?>"
+                  data-cover="<?= e($ep['cover'] ?: ($p['cover'] ?? '')) ?>">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"></polygon></svg>
+          </button>
+          <?php
+          $play_control = ob_get_clean();
+          echo kp_apply_filters('public_episode_play_control', $play_control, $ep, $p);
+          ?>
+          
+          <div class="pub-ep-detail-meta">
+            <?php
+            $epMetaParts = [];
+            if (!empty($ep['duration'])) {
+              $epMetaParts[] = e($ep['duration']);
+            }
+            if (!empty($ep['n']) && (int)$ep['n'] > 0) {
+              $epMetaParts[] = 'Episodio ' . (int)$ep['n'];
+            }
+            if (!empty($ep['s']) && (int)$ep['s'] > 0) {
+              $epMetaParts[] = 'Temporada ' . (int)$ep['s'];
+            }
+            if (!empty($ep['date_iso'])) {
+              $epMetaParts[] = '<span data-kp-date="' . e($ep['date_iso']) . '">Publicado ' . e(kp_relative_time($ep['date_iso'])) . '</span>';
+            }
+            echo implode(' · ', $epMetaParts);
+            ?>
           </div>
-          <div style="font-size:12.5px;color:var(--pub-muted);margin-top:2px"><?= e($ep['duration']) ?></div>
+        </div>
+
+        <button type="button" class="pub-ep-share-btn" onclick="kpShareEpisode(this)" data-title="<?= e($ep['title']) ?>">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+          <span class="pub-ep-share-label">Compartir</span>
+        </button>
+      </div>
+
+      <?php if (!empty($ep['transcript_url'])): ?>
+        <div style="margin-top:20px;display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:10px;width:fit-content">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--pub-muted)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          <div style="font-size:13px">
+            <span style="font-weight:600;color:var(--pub-text)">Transcripción:</span>
+            <a href="<?= e($ep['transcript_url']) ?>" target="_blank" style="color:<?= e($p['color']) ?>;text-decoration:none;margin-left:4px" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Ver o descargar</a>
+          </div>
+        </div>
+      <?php endif; ?>
+    </div>
+
+    <!-- Fila 2 - Izquierda: Capítulos del Episodio (Alineado con Descripción) -->
+    <?php if (!empty($chapters)): ?>
+      <div class="pub-ep-grid-chapters">
+        <h3 class="pub-ep-subheading">Capítulos del episodio</h3>
+        <div class="pub-ep-chapters-clean-list">
+          <?php foreach ($chapters as $ch): 
+              $sec = (int)($ch['startTime'] ?? 0);
+              $fmt = sprintf('%d:%02d', floor($sec / 60), $sec % 60);
+              $ch_img = !empty($ch['img']) ? $ch['img'] : ($p['cover'] ?? '');
+          ?>
+            <button class="pub-ep-chapter-row" data-time="<?= $sec ?>"
+                    data-src="/r/<?= urlencode($p['id']) ?>/<?= urlencode($ep['id']) ?>/audio.mp3"
+                    data-title="<?= e($ep['title']) ?>" data-podcast="<?= e($p['title']) ?>"
+                    data-color="<?= e($p['color']) ?>" data-initial="<?= e($p['initial']) ?>"
+                    data-cover="<?= e($ep['cover'] ?: ($p['cover'] ?? '')) ?>"
+                    aria-label="Saltar al minuto <?= $fmt ?>">
+              <span class="pub-ep-chapter-time"><?= $fmt ?></span>
+              <span class="pub-ep-chapter-title"><?= e($ch['title']) ?></span>
+              <?php if (!empty($ch_img)): ?>
+                <img class="pub-ep-chapter-thumb" src="<?= e($ch_img) ?>" alt="">
+              <?php endif; ?>
+            </button>
+          <?php endforeach; ?>
         </div>
       </div>
-      <?php
-      $play_control = ob_get_clean();
-      echo kp_apply_filters('public_episode_play_control', $play_control, $ep, $p);
-      ?>
-    </div>
-  </div>
-  <div style="border-top:1px solid var(--pub-border);margin-bottom:32px;opacity:0.5"></div>
-  
-  <?php if (!empty($ep['transcript_url'])): ?>
-    <div style="margin-bottom:36px;display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--pub-surface);border:1px solid var(--pub-border);border-radius:12px;width:fit-content">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--pub-muted)" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-      <div>
-        <div style="font-size:14px;font-weight:600;color:var(--pub-text)">Transcripción</div>
-        <a href="<?= e($ep['transcript_url']) ?>" target="_blank" style="font-size:13px;color:<?= e($p['color']) ?>;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">Descargar o visualizar</a>
+    <?php endif; ?>
+
+    <!-- Fila 2 - Derecha: Descripción y Notas del Podcast -->
+    <div class="pub-ep-grid-body" style="<?= empty($chapters) ? 'grid-column: 2;' : '' ?>">
+      <!-- Sección Descripción -->
+      <div class="pub-ep-detail-desc-block">
+        <h3 class="pub-ep-subheading">Descripción</h3>
+        <div class="pub-prose pub-ep-clean-prose">
+          <?php
+            $md = $ep['notes_md'] ?? '';
+            if (!$md) {
+              echo '<p>Sin notas del episodio.</p>';
+            } else {
+              echo kp_md_to_html($md);
+            }
+          ?>
+        </div>
       </div>
-    </div>
-  <?php endif; ?>
 
-  <?php
-  // Load chapters if available
-  $chapters = [];
-  if (!empty($ep['chapters_url']) && file_exists(__DIR__ . '/..' . $ep['chapters_url'])) {
-      $chapsData = json_decode(file_get_contents(__DIR__ . '/..' . $ep['chapters_url']), true);
-      if (!empty($chapsData['chapters'])) {
-          $chapters = $chapsData['chapters'];
-      }
-  }
-  ?>
-
-  <?php if (!empty($chapters)): ?>
-  <div class="pub-chapters">
-    <h3 class="pub-chapters-title">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
-      Capítulos del Episodio
-    </h3>
-    <div class="pub-chapters-list">
-      <?php foreach ($chapters as $ch): 
-          $sec = (int)($ch['startTime'] ?? 0);
-          $fmt = sprintf('%d:%02d', floor($sec / 60), $sec % 60);
-      ?>
-        <button class="pub-chapter-btn" data-time="<?= $sec ?>" style="--podcast-color: <?= e($p['color']) ?>;">
-          <span class="pub-chapter-time"><?= $fmt ?></span>
-          <span class="pub-chapter-text"><?= e($ch['title']) ?></span>
-          <?php if (!empty($ch['img'])): ?>
-            <img class="pub-chapter-img" src="<?= e($ch['img']) ?>" alt="">
-          <?php endif; ?>
-        </button>
-      <?php endforeach; ?>
+      <!-- Sección Notas del Podcast -->
+      <?php if ($fixed_notes): ?>
+      <div class="pub-ep-detail-notes-block">
+        <h3 class="pub-ep-subheading">Notas del podcast</h3>
+        <div class="pub-prose pub-ep-clean-prose" style="--podcast-color: <?= e($p['color']) ?>;">
+          <?= kp_md_to_html($fixed_notes) ?>
+        </div>
+      </div>
+      <?php endif; ?>
     </div>
-  </div>
-  <?php endif; ?>
-  <div class="pub-prose">
-    <?php
-      $md = $ep['notes_md'] ?? '';
-      if (!$md) {
-        echo '<p>Sin notas del episodio.</p>';
-      } else {
-        echo kp_md_to_html($md);
-      }
+
+    <!-- Fila 3 - Ancho Completo: Participantes -->
+    <?php if (!empty($ep['persons_json'])): 
+      $persons = json_decode($ep['persons_json'], true);
+      if (is_array($persons) && count($persons) > 0):
     ?>
-  </div>
-
-  <?php 
-    $fixed_notes = trim($p['fixed_notes'] ?? '');
-    if ($fixed_notes): 
-  ?>
-  <div style="margin-top:20px">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="<?= e($p['color']) ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-      <span style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:<?= e($p['color']) ?>">Notas del podcast</span>
-    </div>
-    <div class="pub-prose" style="opacity:0.85">
-      <?= kp_md_to_html($fixed_notes) ?>
-    </div>
-  </div>
-  <?php endif; ?>
-  
-  <?php if (!empty($ep['persons_json'])): 
-    $persons = json_decode($ep['persons_json'], true);
-    if (is_array($persons) && count($persons) > 0):
-  ?>
-  <div style="margin-top:48px;padding-top:32px;border-top:1px solid var(--pub-border)">
-    <h3 style="font-size:16px;font-weight:600;margin-bottom:24px;color:var(--pub-text)">En este episodio</h3>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:20px">
-      <?php foreach ($persons as $person): ?>
-        <div style="display:flex;align-items:flex-start;gap:16px;background:var(--pub-surface);padding:20px;border-radius:16px;border:1px solid var(--pub-border);box-shadow:0 2px 8px rgba(0,0,0,0.02)">
-          <div style="width:64px;height:64px;border-radius:50%;overflow:hidden;background:var(--pub-border);display:flex;align-items:center;justify-content:center;color:var(--pub-muted);font-weight:bold;font-size:24px;flex-shrink:0">
-            <?php if (!empty($person['avatar'])): ?>
-              <img src="<?= e($person['avatar']) ?>" style="width:100%;height:100%;object-fit:cover" alt="">
-            <?php else: ?>
-              <?= e(mb_substr($person['name'], 0, 1)) ?>
-            <?php endif; ?>
-          </div>
-          <div style="flex:1">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-              <div style="font-size:16px;font-weight:600;color:var(--pub-text)">
-                <?php if (!empty($person['url'])): ?>
-                  <a href="<?= e($person['url']) ?>" target="_blank" style="color:inherit;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'"><?= e($person['name']) ?></a>
-                <?php else: ?>
-                  <?= e($person['name']) ?>
-                <?php endif; ?>
-              </div>
-              <span style="font-size:11px;padding:2px 8px;border-radius:12px;background:var(--pub-border);color:var(--pub-muted);text-transform:capitalize;font-weight:500"><?= e($person['role']) ?></span>
+    <div class="pub-ep-grid-persons">
+      <h3 class="pub-ep-subheading">En este episodio participó:</h3>
+      <div class="pub-ep-persons-grid">
+        <?php foreach ($persons as $person): ?>
+          <div class="pub-ep-person-card">
+            <div class="pub-ep-person-avatar">
+              <?php if (!empty($person['avatar'])): ?>
+                <img src="<?= e($person['avatar']) ?>" alt="<?= e($person['name']) ?>">
+              <?php else: ?>
+                <span><?= e(mb_substr($person['name'], 0, 1)) ?></span>
+              <?php endif; ?>
             </div>
-            
-            <?php if (!empty($person['bio'])): ?>
-              <div style="font-size:13.5px;color:var(--pub-muted);line-height:1.5;margin-bottom:8px"><?= e($person['bio']) ?></div>
-            <?php endif; ?>
-            
-            <?php if (!empty($person['url'])): ?>
-              <a href="<?= e($person['url']) ?>" target="_blank" style="font-size:13px;color:<?= e($p['color']) ?>;text-decoration:none;display:inline-flex;align-items:center;gap:4px" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-                Visitar enlace
-              </a>
-            <?php endif; ?>
+            <div class="pub-ep-person-info">
+              <div class="pub-ep-person-head">
+                <span class="pub-ep-person-name">
+                  <?php if (!empty($person['url'])): ?>
+                    <a href="<?= e($person['url']) ?>" target="_blank"><?= e($person['name']) ?></a>
+                  <?php else: ?>
+                    <?= e($person['name']) ?>
+                  <?php endif; ?>
+                </span>
+                <span class="pub-ep-person-role"><?= e($person['role']) ?></span>
+              </div>
+              <?php if (!empty($person['bio'])): ?>
+                <p class="pub-ep-person-bio"><?= e($person['bio']) ?></p>
+              <?php endif; ?>
+              <?php if (!empty($person['url'])): ?>
+                <a href="<?= e($person['url']) ?>" target="_blank" class="pub-ep-person-link" style="color:<?= e($p['color']) ?>">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                  Visitar enlace
+                </a>
+              <?php endif; ?>
+            </div>
           </div>
-        </div>
-      <?php endforeach; ?>
+        <?php endforeach; ?>
+      </div>
     </div>
+    <?php endif; endif; ?>
   </div>
-  <?php endif; endif; ?>
 </div></section>
+
+<script>
+function kpShareEpisode(btn) {
+  const url = window.location.href;
+  const title = btn.getAttribute('data-title') || document.title;
+  const label = btn.querySelector('.pub-ep-share-label');
+  if (navigator.share) {
+    navigator.share({ title: title, url: url }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => {
+      if (label) {
+        const orig = label.textContent;
+        label.textContent = '¡Enlace copiado!';
+        setTimeout(() => { label.textContent = orig; }, 2000);
+      }
+    }).catch(() => {});
+  }
+}
+</script>

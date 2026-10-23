@@ -218,12 +218,21 @@ function kpUpdateCheck() {
   const btn = document.getElementById('btn-check');
   const status = document.getElementById('update-status');
   const available = document.getElementById('update-available');
+  const progress = document.getElementById('update-progress');
+  const result = document.getElementById('update-result');
+  const applyBtn = document.getElementById('btn-apply');
 
   btn.disabled = true;
   btn.innerHTML = '<?= icon('search',13) ?> Buscando...';
   status.style.display = 'block';
   status.innerHTML = '<div style="padding:14px;color:var(--text-3);font-size:13.5px">Consultando GitHub...</div>';
   available.style.display = 'none';
+  if (progress) progress.style.display = 'none';
+  if (result) result.style.display = 'none';
+  if (applyBtn) {
+    applyBtn.disabled = false;
+    applyBtn.innerHTML = '<?= icon('download',13) ?> Actualizar ahora';
+  }
 
   fetch('/api/update?action=check')
     .then(r => r.json())
@@ -240,6 +249,10 @@ function kpUpdateCheck() {
         _updateData = data;
         status.style.display = 'none';
         available.style.display = 'block';
+        if (applyBtn) {
+          applyBtn.disabled = false;
+          applyBtn.innerHTML = '<?= icon('download',13) ?> Actualizar ahora';
+        }
         document.getElementById('update-version-label').textContent = data.name || ('v' + data.new_version);
         document.getElementById('update-date-label').textContent = data.published_at
           ? 'Publicado el ' + new Date(data.published_at).toLocaleDateString('es', {year:'numeric', month:'long', day:'numeric'})
@@ -341,6 +354,9 @@ function kpUpdateApply() {
               'KutPod actualizado de <strong>v' + data.from + '</strong> a <strong>v' + data.to + '</strong>. ' +
               data.files_updated + ' ficheros actualizados.<br><br>' +
               '<a href="/admin/update" class="btn btn-primary" style="margin-top:8px">Recargar página</a>';
+            btn.disabled = false;
+            btn.innerHTML = '<?= icon('download',13) ?> Actualizar ahora';
+            _updateData = null;
           }
         });
     })

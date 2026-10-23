@@ -111,3 +111,18 @@ Tecnología:
     - Se integró la migración automática de esquema v7 en `includes/db.php` para actualizar retroactivamente en la base de datos de producción todos los episodios ya publicados que tenían `published_at` en `NULL`, asignándoles `publish_at` o `created_at`.
 - **Robustez en ActivityPub y RSS**:
     - Se incorporaron fallbacks consistentes a `publish_at` y `created_at` tanto al generar la fecha del objeto Note de ActivityPub en `activitypub.php` como en la etiqueta `<pubDate>` de `feed.php`.
+
+10. Mejoras en Frontend, Reproducción de Capítulos y Gestor de Actualizaciones
+- **Gestión fluida de actualizaciones consecutivas en el Panel de Administración**:
+    - Se solucionó un problema en `/admin/update` donde, tras aplicarse una actualización con éxito, el botón "Actualizar ahora" (`#btn-apply`) permanecía deshabilitado y el mensaje de recarga bloqueaba la interfaz si el usuario buscaba otra versión disponible sin antes recargar la página.
+    - La búsqueda de actualizaciones (`kpUpdateCheck`) ahora restablece limpiamente la barra de progreso, oculta el mensaje de éxito previo y reactiva el botón de actualización para permitir actualizaciones continuas inmediatas.
+- **Conmutación y reproducción precisa de capítulos entre episodios (Frontend)**:
+    - Se corrigió el comportamiento del reproductor persistente con navegación PJAX: al reproducir un episodio y navegar a otro episodio que contenga capítulos, al pulsar en cualquiera de sus capítulos ahora se cambia de pista automáticamente al nuevo episodio, se actualizan la carátula y los metadatos en el reproductor y, tras cargar la pista, salta al minuto exacto del capítulo.
+    - Si se pulsa un capítulo del mismo episodio que ya está en reproducción, salta inmediatamente a la posición indicada sin recargas innecesarias.
+    - Se integraron los atributos `data-src`, `data-title`, `data-podcast`, `data-color` y `data-cover` directamente en los botones de capítulo (`.pub-ep-chapter-row`).
+- **Reflejos en portadas del Podcast y Detalle del Episodio**:
+    - Implementación de un reflejo realista mediante inversión vertical (`transform: scaleY(-1)`) y gradientes de máscara alfa (`mask-image` y `-webkit-mask-image`), tanto en la carátula del hero en la página del podcast (`public/show.php`) como en el episodio individual (`public/episode.php`).
+    - El desvanecimiento es transparente y se fusiona naturalmente con los fondos de color, gradientes temáticos del show y el modo oscuro.
+- **Rediseño del Frontend (Show y Episodios)**:
+    - Nueva disposición en CSS Grid de 2 filas en la vista de episodio para garantizar que la sección de capítulos y la columna de descripción comiencen exactamente en la misma línea horizontal.
+    - Rediseño de la lista de episodios con tipografía más legible y moderna (títulos a 22px en color `#504e5d` y encabezados a 28px), botón de play pill con el color de acento del podcast, espaciado vertical armónico y botón de compartir con icono integrado.

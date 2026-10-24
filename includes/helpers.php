@@ -264,9 +264,20 @@ function kp_notify_websub(string $feed_url): void {
 }
 
 function kp_unaccent(string $s): string {
-  return preg_replace('/[\x{0300}-\x{036f}]/u', '',
-    iconv('UTF-8','UTF-8//IGNORE',
-      Normalizer::normalize($s, Normalizer::FORM_D) ?: $s));
+  if (function_exists('iconv') && class_exists('Normalizer')) {
+    return preg_replace('/[\x{0300}-\x{036f}]/u', '',
+      iconv('UTF-8','UTF-8//IGNORE',
+        Normalizer::normalize($s, Normalizer::FORM_D) ?: $s));
+  }
+  $map = [
+    'á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','Á'=>'A','É'=>'E','Í'=>'I','Ó'=>'O','Ú'=>'U',
+    'à'=>'a','è'=>'e','ì'=>'i','ò'=>'o','ù'=>'u','À'=>'A','È'=>'E','Ì'=>'I','Ò'=>'O','Ù'=>'U',
+    'ä'=>'a','ë'=>'e','ï'=>'i','ö'=>'o','ü'=>'u','Ä'=>'A','Ë'=>'E','Ï'=>'I','Ö'=>'O','Ü'=>'U',
+    'â'=>'a','ê'=>'e','î'=>'i','ô'=>'o','û'=>'u','Â'=>'A','Ê'=>'E','Î'=>'I','Ô'=>'O','Û'=>'U',
+    'ã'=>'a','õ'=>'o','Ã'=>'A','Õ'=>'O',
+    'ñ'=>'n','Ñ'=>'N','ç'=>'c','Ç'=>'C'
+  ];
+  return strtr($s, $map);
 }
 
 function kp_slugify(string $s): string {

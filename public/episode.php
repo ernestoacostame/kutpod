@@ -112,13 +112,15 @@ $fixed_notes = trim($p['fixed_notes'] ?? '');
         <div class="pub-ep-detail-play-row">
           <?php
           ob_start();
+          $play_label = 'Reproducir' . (!empty($ep['duration']) ? ' · ' . e($ep['duration']) : '');
           ?>
           <button class="pub-ep-play-pill" style="background:<?= e($p['color']) ?>;color:#fff" aria-label="Reproducir <?= e($ep['title']) ?>"
                   data-kp-play data-src="/r/<?= urlencode($p['id']) ?>/<?= urlencode($ep['id']) ?>/audio.mp3"
                   data-title="<?= e($ep['title']) ?>" data-podcast="<?= e($p['title']) ?>"
                   data-color="<?= e($p['color']) ?>" data-initial="<?= e($p['initial']) ?>"
                   data-cover="<?= e($ep['cover'] ?: ($p['cover'] ?? '')) ?>">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"></polygon></svg>
+            <?= icon('play', 13) ?>
+            <span><?= $play_label ?></span>
           </button>
           <?php
           $play_control = ob_get_clean();
@@ -128,19 +130,16 @@ $fixed_notes = trim($p['fixed_notes'] ?? '');
           <div class="pub-ep-detail-meta">
             <?php
             $epMetaParts = [];
-            if (!empty($ep['duration'])) {
-              $epMetaParts[] = e($ep['duration']);
-            }
             if (!empty($ep['n']) && (int)$ep['n'] > 0) {
-              $epMetaParts[] = 'Episodio ' . (int)$ep['n'];
+              $epMetaParts[] = '<span>Episodio ' . (int)$ep['n'] . '</span>';
             }
             if (!empty($ep['s']) && (int)$ep['s'] > 0) {
-              $epMetaParts[] = 'Temporada ' . (int)$ep['s'];
+              $epMetaParts[] = '<span>Temporada ' . (int)$ep['s'] . '</span>';
             }
             if (!empty($ep['date_iso'])) {
               $epMetaParts[] = '<span data-kp-date="' . e($ep['date_iso']) . '">Publicado ' . e(kp_relative_time($ep['date_iso'])) . '</span>';
             }
-            echo implode(' · ', $epMetaParts);
+            echo implode('<span class="pub-ep-meta-sep" aria-hidden="true">·</span>', $epMetaParts);
             ?>
           </div>
         </div>
@@ -190,7 +189,7 @@ $fixed_notes = trim($p['fixed_notes'] ?? '');
     <?php endif; ?>
 
     <!-- Fila 2 - Derecha: Descripción y Notas del Podcast -->
-    <div class="pub-ep-grid-body" style="<?= empty($chapters) ? 'grid-column: 2;' : '' ?>">
+    <div class="pub-ep-grid-body">
       <!-- Sección Descripción -->
       <div class="pub-ep-detail-desc-block">
         <h3 class="pub-ep-subheading">Descripción</h3>

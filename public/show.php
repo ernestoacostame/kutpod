@@ -254,12 +254,14 @@ if ($is_premium_show) {
         <div class="pub-ep-bottom">
           <div class="pub-ep-action">
             <?php 
+            $play_label = 'Reproducir' . (!empty($ep['duration']) ? ' · ' . e($ep['duration']) : '');
             $play_btn = '<button class="pub-ep-play-pill" style="background:'.e($p['color']).';color:#fff" aria-label="Reproducir ' . e($ep['title']) . '"
                     data-kp-play data-src="/r/'.urlencode($p['id']).'/'.urlencode($ep['id']).'/audio.mp3"
                     data-title="'.e($ep['title']).'" data-podcast="'.e($p['title']).'"
                     data-color="'.e($p['color']).'" data-initial="'.e($p['initial']).'"
                     data-cover="'.e($ep['cover'] ?: ($p['cover'] ?? '')).'">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"></polygon></svg>
+              ' . icon('play', 13) . '
+              <span>' . $play_label . '</span>
             </button>';
             echo kp_apply_filters('public_show_episode_play_button', $play_btn, $ep, $p);
             ?>
@@ -267,16 +269,16 @@ if ($is_premium_show) {
           <div class="pub-ep-meta">
             <?php
             $meta = [];
-            if (!empty($ep['duration'])) {
-              $meta[] = e($ep['duration']);
-            }
             if (!empty($ep['s']) && (int)$ep['s'] > 0) {
-              $meta[] = 'Temporada ' . (int)$ep['s'];
+              $meta[] = '<span>Temporada ' . (int)$ep['s'] . '</span>';
+            }
+            if (!empty($ep['n']) && (int)$ep['n'] > 0) {
+              $meta[] = '<span>Episodio ' . (int)$ep['n'] . '</span>';
             }
             if (!empty($ep['date_iso'])) {
               $meta[] = '<span data-kp-date="' . e($ep['date_iso']) . '">Publicado ' . e(kp_relative_time($ep['date_iso'])) . '</span>';
             }
-            echo implode(' · ', $meta);
+            echo implode('<span class="pub-ep-meta-sep" aria-hidden="true">·</span>', $meta);
             ?>
           </div>
         </div>

@@ -177,7 +177,7 @@ if ($masto_url) {
     });
   });
 
-  // Tooltip personalizado premium para fechas
+  // Tooltip personalizado para fechas (compatible con Safari, Dia, Chromium y Firefox)
   (function() {
     const tooltip = document.createElement('div');
     tooltip.className = 'kp-custom-tooltip';
@@ -189,7 +189,7 @@ if ($masto_url) {
         cursor: help;
       }
       .kp-custom-tooltip {
-        position: absolute;
+        position: fixed;
         background: rgba(15, 23, 42, 0.95);
         color: #f8fafc;
         padding: 6px 12px;
@@ -198,70 +198,95 @@ if ($masto_url) {
         font-weight: 500;
         pointer-events: none;
         opacity: 0;
-        transform: translate(-50%, 6px) scale(0.95);
         transition: opacity 0.15s ease, transform 0.15s ease;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-        z-index: 99999;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        z-index: 100000;
         white-space: nowrap;
-        backdrop-filter: blur(4px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
+        -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        will-change: transform, opacity;
       }
       .kp-custom-tooltip.visible {
         opacity: 1;
-        transform: translate(-50%, 0) scale(1);
       }
     `;
     document.head.appendChild(style);
 
-    document.querySelectorAll('[data-kp-date]').forEach(el => {
-      const iso = el.getAttribute('data-kp-date');
-      if (!iso) return;
-      
-      let formatted = '';
+    function formatDate(iso) {
+      if (!iso) return '';
       try {
-        const dateStr = (iso.includes(' ') && !iso.includes('Z') && !iso.includes('+')) ? iso.replace(' ', 'T') + 'Z' : iso;
+        let dateStr = iso;
+        if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(iso)) {
+          dateStr = iso.replace(' ', 'T') + 'Z';
+        } else if (iso.includes(' ') && !iso.includes('Z') && !iso.includes('+')) {
+          dateStr = iso.replace(' ', 'T') + 'Z';
+        }
         const d = new Date(dateStr);
         if (!isNaN(d.getTime())) {
-          formatted = d.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
+          return d.toLocaleDateString(undefined, { year: 'numeric', month: '2-digit', day: '2-digit' });
         }
-      } catch(e) {}
+      } catch (e) {}
+      return '';
+    }
 
+    let activeEl = null;
+
+    function showTooltip(el) {
+      const iso = el.getAttribute('data-kp-date');
+      const formatted = el.getAttribute('data-formatted-date') || formatDate(iso);
       if (!formatted) return;
 
+      activeEl = el;
       el.removeAttribute('title');
       el.setAttribute('data-formatted-date', formatted);
 
-      const showTooltip = () => {
-        tooltip.textContent = formatted;
-        tooltip.classList.add('visible');
-        
-        const rect = el.getBoundingClientRect();
-        const scrollY = window.scrollY || window.pageYOffset;
-        const scrollX = window.scrollX || window.pageXOffset;
-        
-        // Centrar y posicionar arriba
-        tooltip.style.left = (rect.left + rect.width / 2 + scrollX) + 'px';
-        tooltip.style.top = (rect.top - 36 + scrollY) + 'px';
-      };
+      tooltip.textContent = formatted;
+      const rect = el.getBoundingClientRect();
 
-      const hideTooltip = () => {
+      tooltip.style.left = (rect.left + rect.width / 2) + 'px';
+      if (rect.top < 45) {
+        tooltip.style.top = (rect.bottom + 8) + 'px';
+        tooltip.style.transform = 'translate(-50%, 0) scale(1)';
+      } else {
+        tooltip.style.top = (rect.top - 8) + 'px';
+        tooltip.style.transform = 'translate(-50%, -100%) scale(1)';
+      }
+      tooltip.classList.add('visible');
+    }
+
+    function hideTooltip() {
+      if (activeEl) {
         tooltip.classList.remove('visible');
-      };
+        activeEl = null;
+      }
+    }
 
-      el.addEventListener('mouseenter', showTooltip);
-      el.addEventListener('mouseleave', hideTooltip);
-      el.addEventListener('focus', showTooltip);
-      el.addEventListener('blur', hideTooltip);
-      
-      el.addEventListener('touchstart', (e) => {
-        e.stopPropagation();
-        showTooltip();
-      }, {passive: true});
+    // Delegación de eventos para mayor rendimiento y soporte en todos los navegadores
+    document.addEventListener('mouseover', (e) => {
+      const el = e.target.closest('[data-kp-date]');
+      if (el) {
+        showTooltip(el);
+      } else if (activeEl && !e.target.closest('.kp-custom-tooltip')) {
+        hideTooltip();
+      }
     });
 
-    document.addEventListener('touchstart', () => {
-      tooltip.classList.remove('visible');
-    }, {passive: true});
+    document.addEventListener('mouseout', (e) => {
+      const el = e.target.closest('[data-kp-date]');
+      if (el && (!e.relatedTarget || !el.contains(e.relatedTarget))) {
+        hideTooltip();
+      }
+    });
+
+    // Ocultar si se hace scroll en el contenedor principal (.pub-root) o en window
+    const pubRoot = document.querySelector('.pub-root');
+    if (pubRoot) {
+      pubRoot.addEventListener('scroll', hideTooltip, { passive: true });
+    }
+    window.addEventListener('scroll', hideTooltip, { passive: true });
+
+    document.addEventListener('touchstart', hideTooltip, { passive: true });
   })();
 </script>
 </body>

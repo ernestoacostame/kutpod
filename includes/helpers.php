@@ -70,12 +70,25 @@ function kp_get_protocol(): string {
   return 'http';
 }
 
+function kp_base_url(): string {
+  return kp_get_protocol() . '://' . kp_handle_domain();
+}
+
 if (!function_exists('human_bytes')) {
   function human_bytes($n): string {
     if ($n === null) return '—';
     $u = ['B','KB','MB','GB','TB']; $i = 0; $n = (float)$n;
     while ($n >= 1024 && $i < count($u)-1) { $n /= 1024; $i++; }
     return number_format($n, $n < 10 && $i > 0 ? 2 : 0) . ' ' . $u[$i];
+  }
+}
+
+if (!function_exists('get_public_platform_svg')) {
+  function get_public_platform_svg(string $type, string $slug): string {
+    $path = __DIR__ . '/../public/assets/platforms/' . $type . '/' . $slug . '.svg';
+    if (!file_exists($path)) $path = __DIR__ . '/../public/assets/platforms/' . $type . '/default.svg';
+    if (file_exists($path)) return file_get_contents($path);
+    return icon('link', 20);
   }
 }
 
@@ -124,6 +137,7 @@ function icon(string $name, int $size = 16): string {
     'shoppingBag'=>'<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>',
     'star'=>'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
     'award'=>'<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+    'externalLink'=>'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
   ];
   $p = $paths[$name] ?? '';
   return "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\">$p</svg>";

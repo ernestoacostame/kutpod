@@ -6,6 +6,12 @@
   function $(s, r = document) { return r.querySelector(s); }
   function fmt(sec) { return Math.floor(sec/60) + ':' + String(Math.floor(sec%60)).padStart(2,'0'); }
 
+  const ICONS = {
+    volumeHigh: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>`,
+    volumeLow: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`,
+    volumeMute: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
+  };
+
   function ensurePlayerDOM() {
     if ($('.pub-player')) return;
     const el = document.createElement('div');
@@ -29,7 +35,7 @@
       </div>
       <div class="pub-player-extras">
         <div class="row" style="gap:6px;align-items:center;margin-right:10px">
-          <button id="kpVolBtn" class="pub-player-chip" style="padding: 5px 8px; min-width: 32px">🔊</button>
+          <button id="kpVolBtn" class="pub-player-chip" style="padding: 5px 8px; min-width: 32px; display: inline-flex; align-items: center; justify-content: center" aria-label="Silenciar" title="Silenciar">${ICONS.volumeHigh}</button>
           <input type="range" id="kpVolume" class="pub-volume" min="0" max="1" step="0.05" value="1">
         </div>
         <select id="kpSpeed" class="pub-player-chip" style="appearance:none;padding-right:10px;text-align:center;outline:none">
@@ -78,7 +84,7 @@
     const updateVolumeUI = () => {
       const isMuted = audio.muted || (isVolumeSettable && audio.volume === 0);
       if (isMuted) {
-        volBtn.textContent = '🔇';
+        volBtn.innerHTML = ICONS.volumeMute;
         volBtn.title = 'Activar sonido';
         volBtn.setAttribute('aria-label', 'Activar sonido');
         if (isVolumeSettable) {
@@ -88,9 +94,9 @@
       } else {
         const vol = isVolumeSettable ? audio.volume : 1;
         if (vol < 0.5) {
-          volBtn.textContent = '🔉';
+          volBtn.innerHTML = ICONS.volumeLow;
         } else {
-          volBtn.textContent = '🔊';
+          volBtn.innerHTML = ICONS.volumeHigh;
         }
         volBtn.title = 'Silenciar';
         volBtn.setAttribute('aria-label', 'Silenciar');
@@ -166,6 +172,14 @@
       $('#kpThumb').style.left = pct + '%';
       $('#kpCur').textContent = fmt(audio.currentTime);
       if (audio.duration) $('#kpDur').textContent = fmt(audio.duration);
+    };
+    audio.onended = () => {
+      audio.pause();
+      const player = $('.pub-player');
+      if (player) {
+        player.remove();
+      }
+      audio.src = '';
     };
   }
 

@@ -101,6 +101,21 @@ function kp_db(): PDO {
         try { $pdo->exec("ALTER TABLE alerts ADD COLUMN actor_avatar TEXT"); } catch (Throwable $e) {}
         try { $pdo->exec("ALTER TABLE alerts ADD COLUMN actor_name TEXT"); } catch (Throwable $e) {}
         
+        // Tabla de Likes de ActivityPub (Fediverso)
+        try {
+          $pdo->exec("CREATE TABLE IF NOT EXISTS ap_likes (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            podcast_id  INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
+            episode_id  INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+            actor_url   TEXT NOT NULL,
+            actor_name  TEXT,
+            actor_handle TEXT,
+            actor_avatar TEXT,
+            created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(episode_id, actor_url)
+          )");
+        } catch (Throwable $e) {}
+        
         // Migraciones para api_tokens (Kut Editor) - Unificación definitiva
         try {
           $cols = $pdo->query("PRAGMA table_info(api_tokens)")->fetchAll();
@@ -264,6 +279,28 @@ function kp_db(): PDO {
     // Guardar versión de esquema en settings
     try {
       $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '7') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
+    } catch (Throwable $e) {}
+  }
+
+  if ($current_version < 8) {
+    // Versión 8: Tabla de likes del Fediverso (ActivityPub)
+    try {
+      $pdo->exec("CREATE TABLE IF NOT EXISTS ap_likes (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        podcast_id  INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
+        episode_id  INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+        actor_url   TEXT NOT NULL,
+        actor_name  TEXT,
+        actor_handle TEXT,
+        actor_avatar TEXT,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE(episode_id, actor_url)
+      )");
+    } catch (Throwable $e) {}
+
+    // Guardar versión de esquema en settings
+    try {
+      $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '8') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
     } catch (Throwable $e) {}
   }
   

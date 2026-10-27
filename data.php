@@ -122,6 +122,7 @@ function kp_episodes(bool $all = false, ?string $podcastSlug = null, ?int $limit
         e.cover                                 AS cover,
         e.audio_url                             AS audio_url,
         e.audio_bytes                           AS audio_bytes,
+        e.transcript_url                        AS transcript_url,
         e.chapters_url                          AS chapters_url,
         e.notes_md                              AS notes_md,
         e.persons_json                          AS persons_json,

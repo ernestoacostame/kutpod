@@ -129,6 +129,14 @@ function kp_op3_track_and_redirect(string $showSlug, string $episodeSlug): void 
                     ORDER BY length(e.slug) DESC LIMIT 1",
                     [$showSlug, $episodeSlug . '%']);
     }
+
+    // 3) Rescate por IDs numéricos si los parámetros son enteros
+    if (!$ep && is_numeric($showSlug) && is_numeric($episodeSlug)) {
+      $ep = kp_one("SELECT e.*, p.id as p_id, p.slug as p_slug, p.op3 as p_op3
+                    FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
+                    WHERE p.id = ? AND e.id = ? AND e.status = 'published'",
+                    [(int)$showSlug, (int)$episodeSlug]);
+    }
   }
 
   if (!$ep || !$ep['audio_url']) { http_response_code(404); exit('Not found'); }

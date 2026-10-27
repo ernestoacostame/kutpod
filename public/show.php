@@ -52,11 +52,13 @@ require_once __DIR__ . '/../includes/platforms.php';
 $broadcast_links = !empty($p['broadcast_links']) ? json_decode($p['broadcast_links'], true) : [];
 $visible_platforms = array_filter($broadcast_links, fn($c) => !empty($c['visible']) && !empty($c['link']));
 
-function get_public_platform_svg($type, $slug) {
+if (!function_exists('get_public_platform_svg')) {
+  function get_public_platform_svg($type, $slug) {
     $path = __DIR__ . '/../public/assets/platforms/' . $type . '/' . $slug . '.svg';
     if (!file_exists($path)) $path = __DIR__ . '/../public/assets/platforms/' . $type . '/default.svg';
     if (file_exists($path)) return file_get_contents($path);
     return icon('link', 24);
+  }
 }
 
 // Validar acceso premium y token para mostrar/ocultar el botón RSS

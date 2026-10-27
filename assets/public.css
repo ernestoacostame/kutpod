@@ -1528,10 +1528,17 @@ select option {
   color: var(--pub-text);
 }
 
-/* Fila 2 - Columna Izquierda: Capítulos (Alineado con Descripción) */
+/* Fila 2 - Columna Izquierda: Barra Lateral Unificada (Capítulos y/o Widgets) */
+.pub-ep-grid-sidebar,
 .pub-ep-grid-chapters {
   grid-column: 1;
   grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.pub-ep-chapters-block {
   display: flex;
   flex-direction: column;
 }
@@ -1598,6 +1605,505 @@ select option {
   border-radius: 4px;
   object-fit: cover;
   flex-shrink: 0;
+}
+
+
+.pub-ep-side-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.pub-ep-side-heading {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #67666f;
+  margin: 0 0 14px 0;
+}
+
+[data-theme="dark"] .pub-ep-side-heading {
+  color: #a8a5b5;
+}
+
+/* 1. Navegación entre episodios */
+.pub-ep-side-nav-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pub-ep-side-nav-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 140ms ease;
+}
+
+.pub-ep-side-nav-card:hover {
+  border-color: rgba(20, 20, 30, 0.22);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="dark"] .pub-ep-side-nav-card:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.pub-ep-side-nav-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--pub-muted);
+}
+
+.pub-ep-side-nav-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pub-text);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 2. Plataformas de escucha (Solo iconos horizontales en sidebar) */
+.pub-ep-side-platforms-icons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 18px;
+  width: 100%;
+}
+
+.pub-ep-side-platform-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 28px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--pub-text);
+  opacity: 0.7;
+  text-decoration: none;
+  transition: opacity 160ms ease, color 160ms ease, transform 160ms ease;
+  flex-shrink: 0;
+}
+
+.pub-ep-side-platform-icon:hover {
+  opacity: 1;
+  color: var(--podcast-color, var(--pub-text));
+  transform: translateY(-2px);
+}
+
+.pub-ep-side-platform-icon:focus-visible {
+  outline: 2px solid var(--podcast-color, var(--pub-accent));
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.pub-ep-side-platform-icon svg {
+  width: 28px;
+  height: 28px;
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+
+/* Redes y enlaces de apoyo */
+.pub-ep-side-platforms-list,
+.pub-ep-side-links-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pub-ep-side-plat-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: 9px;
+  text-decoration: none;
+  color: var(--pub-text);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: all 140ms ease;
+}
+
+.pub-ep-side-plat-badge:hover {
+  border-color: rgba(20, 20, 30, 0.22);
+  background: var(--pub-bg-2);
+}
+
+[data-theme="dark"] .pub-ep-side-plat-badge:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.pub-ep-side-plat-icon {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--pub-muted);
+}
+
+.pub-ep-side-plat-icon svg {
+  width: 18px;
+  height: 18px;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.pub-ep-side-plat-label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pub-ep-side-badge-support {
+  border-left: 3px solid var(--badge-accent, var(--pub-text));
+}
+
+/* 3. Ficha Técnica y Descarga */
+.pub-ep-side-meta-card {
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+
+.pub-ep-side-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+.pub-ep-side-meta-k {
+  color: var(--pub-muted);
+}
+
+.pub-ep-side-meta-v {
+  font-weight: 600;
+  color: var(--pub-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pub-ep-side-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pub-ep-side-dl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 14px;
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--pub-text);
+  text-decoration: none;
+  transition: all 140ms ease;
+}
+
+.pub-ep-side-dl-btn:hover {
+  background: var(--pub-text);
+  color: var(--pub-bg);
+  border-color: var(--pub-text);
+}
+
+.pub-ep-side-transcript-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 12px;
+  background: transparent;
+  border: 1px dashed var(--pub-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pub-muted);
+  text-decoration: none;
+  transition: all 140ms ease;
+}
+
+.pub-ep-side-transcript-btn:hover {
+  color: var(--pub-text);
+  border-color: var(--pub-muted);
+}
+
+/* 4. Participantes en la barra lateral */
+.pub-ep-side-persons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pub-ep-side-person-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: 10px;
+}
+
+.pub-ep-side-person-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--pub-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pub-muted);
+}
+
+.pub-ep-side-person-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pub-ep-side-person-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pub-ep-side-person-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pub-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pub-ep-side-person-name a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.pub-ep-side-person-name a:hover {
+  text-decoration: underline;
+}
+
+.pub-ep-side-person-role {
+  font-size: 11px;
+  color: var(--pub-muted);
+  display: block;
+  margin-top: 1px;
+}
+
+/* 6. Likes del Fediverso */
+.pub-ep-side-likes-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.pub-ep-side-likes-card {
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pub-ep-side-likes-summary {
+  font-size: 12px;
+  color: var(--pub-text);
+  font-weight: 500;
+}
+
+.pub-ep-side-likes-summary strong {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.pub-ep-side-likes-avatars {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.pub-ep-side-like-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--pub-surface);
+  box-shadow: 0 0 0 1px var(--pub-border), 0 2px 6px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--pub-surface-2, #f1f5f9);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.pub-ep-side-like-avatar:hover {
+  transform: translateY(-2px) scale(1.1);
+  box-shadow: 0 0 0 2px #ef4444, 0 6px 14px rgba(239, 68, 68, 0.25);
+  z-index: 2;
+}
+
+.pub-ep-side-like-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pub-ep-side-like-initial {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pub-muted);
+  text-transform: uppercase;
+}
+
+.pub-ep-side-likes-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 2px;
+}
+
+.pub-ep-side-likes-empty-icon {
+  color: #ef4444;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pub-ep-side-likes-empty p {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--pub-muted);
+  margin: 0;
+}
+
+/* 7. Incrustar Reproductor */
+.pub-ep-side-embed-card {
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pub-ep-side-embed-desc {
+  font-size: 12px;
+  color: var(--pub-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.pub-ep-side-embed-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--pub-bg);
+  border: 1px solid var(--pub-border);
+  border-radius: 8px;
+  padding: 4px 6px;
+}
+
+.pub-ep-side-embed-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--pub-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  outline: none;
+}
+
+.pub-ep-side-embed-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--pub-text);
+  background: var(--pub-surface);
+  border: 1px solid var(--pub-border);
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.pub-ep-side-embed-copy-btn:hover {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: var(--accent);
+}
+
+.pub-ep-side-embed-links {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pub-ep-side-embed-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--pub-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.pub-ep-side-embed-preview:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 
 /* Fila 2 - Columna Derecha: Descripción y Notas */
@@ -1773,7 +2279,8 @@ select option {
     line-height: 1.5;
   }
 
-  .pub-ep-grid-chapters {
+  .pub-ep-grid-chapters,
+  .pub-ep-grid-sidebar {
     grid-column: 1;
     grid-row: auto;
   }

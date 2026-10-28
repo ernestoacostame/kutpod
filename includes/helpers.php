@@ -138,6 +138,7 @@ function icon(string $name, int $size = 16): string {
     'star'=>'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
     'award'=>'<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
     'externalLink'=>'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
+    'mapPin'=>'<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
   ];
   $p = $paths[$name] ?? '';
   return "<svg width=\"$size\" height=\"$size\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\">$p</svg>";
@@ -593,6 +594,17 @@ if (file_exists(__DIR__ . '/../storage/kutpod.db')) {
     if (is_array($active)) {
       foreach ($active as $plugin) {
         $file = __DIR__ . "/../plugins/$plugin/$plugin.php";
+        if (!file_exists($file)) {
+          foreach ([$plugin, strtolower($plugin), ucfirst($plugin), 'KutBlog'] as $pDir) {
+            foreach ([$plugin, strtolower($plugin), ucfirst($plugin), 'kutblog'] as $pFile) {
+              $candidate = __DIR__ . "/../plugins/$pDir/$pFile.php";
+              if (file_exists($candidate)) {
+                $file = $candidate;
+                break 2;
+              }
+            }
+          }
+        }
         if (file_exists($file)) {
           include_once $file;
         }

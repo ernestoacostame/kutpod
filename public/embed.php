@@ -12,8 +12,8 @@ require_once __DIR__ . '/../data.php';
 require_once __DIR__ . '/../includes/helpers.php';
 
 // Resolver episodio y podcast
-$epParam = $_GET['ep'] ?? '';
-$showParam = $_GET['show'] ?? '';
+$epParam = trim($_GET['ep'] ?? '');
+$showParam = ltrim(trim($_GET['show'] ?? ''), '@');
 $idParam = (int)($_GET['id'] ?? 0);
 
 $ep = null;
@@ -28,6 +28,13 @@ if ($idParam > 0) {
     $p = kp_one("SELECT * FROM podcasts WHERE slug = ?", [$showParam]);
     if ($p) {
         $ep = kp_one("SELECT * FROM episodes WHERE podcast_id = ? AND slug = ? AND status = 'published'", [$p['id'], $epParam]);
+    }
+    // Fallback: si por alguna razón no coincidió con ese podcast, buscar directamente por slug del episodio
+    if (!$ep) {
+        $ep = kp_one("SELECT * FROM episodes WHERE slug = ? AND status = 'published'", [$epParam]);
+        if ($ep) {
+            $p = kp_one("SELECT * FROM podcasts WHERE id = ?", [$ep['podcast_id']]);
+        }
     }
 } elseif ($epParam) {
     $ep = kp_one("SELECT * FROM episodes WHERE slug = ? AND status = 'published'", [$epParam]);
@@ -522,6 +529,18 @@ $durationFmt = $ep['duration'] ?: ($durationSecs > 0 ? kp_fmt_duration($duration
       scrubber.addEventListener('pointercancel', () => {
         isDragging = false;
         scrubber.classList.remove('dragging');
+      });
+
+      // Soporte postMessage desde KutBlog (saltos de capítulos y timestamps)
+      window.addEventListener('message', (event) => {
+        if (!event.data || typeof event.data !== 'object') return;
+        if (event.data.action === 'seek') {
+          const time = parseFloat(event.data.time);
+          if (!isNaN(time) && isFinite(time)) {
+            audio.currentTime = Math.max(0, Math.min(audio.duration || time, time));
+            if (audio.paused) audio.play().catch(() => {});
+          }
+        }
       });
     })();
   </script>

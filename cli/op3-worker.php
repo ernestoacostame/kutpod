@@ -68,7 +68,7 @@ if ($total['inserted'] > 0) {
   if ($detailStr) {
     $body .= " Detalles: " . $detailStr . ".";
   }
-  kp_alert('op3', 'Descargas procesadas', $body, '');
+  kp_alert('downloads', 'Descargas procesadas', $body, '');
 }
 
 // Detección de milestones de descargas por episodio
@@ -87,12 +87,12 @@ try {
     foreach ($milestones as $m) {
       if ($dl >= $m && $dl < $m + ($total['inserted'] ?: 1)) {
         // Verificar que no hayamos generado este milestone antes
-        $already = kp_one("SELECT 1 FROM alerts WHERE kind='op3' AND title LIKE ? AND body LIKE ? LIMIT 1",
+        $already = kp_one("SELECT 1 FROM alerts WHERE (kind='op3' OR kind='milestones') AND title LIKE ? AND body LIKE ? LIMIT 1",
           ["%$m descargas%", "%{$ep['title']}%"]);
         if (!$already) {
           $emoji = $m >= 10000 ? '🔥' : ($m >= 1000 ? '🎉' : '📈');
           $epLink = '/admin/podcast/' . urlencode($ep['podcast_slug']) . '?tab=analytics';
-          kp_alert('op3', "$emoji $m descargas alcanzadas",
+          kp_alert('milestones', "$emoji $m descargas alcanzadas",
             "El episodio '{$ep['title']}' de {$ep['podcast_title']} ha superado las " . number_format($m) . " descargas.",
             $epLink);
         }

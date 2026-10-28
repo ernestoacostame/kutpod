@@ -191,20 +191,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $persons_json = json_encode($persons_list, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
   }
 
+  $location_name = trim($_POST['location_name'] ?? $_POST['ep_location'] ?? '');
+  $lat = null;
+  $lon = null;
+  if (!empty($_POST['ep_latlon'])) {
+      $parts = explode(',', $_POST['ep_latlon']);
+      if (count($parts) === 2 && is_numeric(trim($parts[0])) && is_numeric(trim($parts[1]))) {
+          $lat = (float)trim($parts[0]);
+          $lon = (float)trim($parts[1]);
+      }
+  }
+
   $was_published = false;
   if ($ep) {
       $published_at = $ep['published_at'] ?? null;
       if ($status === 'published' && empty($published_at)) {
           $published_at = $publish_at ?: gmdate('Y-m-d H:i:s');
       }
-      $pdo->prepare("UPDATE episodes SET title=?, slug=?, notes_md=?, season=?, number=?, ep_type=?, status=?, transcript_url=?, chapters_url=?, audio_url=?, audio_bytes=?, duration_secs=?, cover=?, publish_at=?, published_at=?, persons_json=?, premium=?, updated_at=datetime('now') WHERE id=?")
-          ->execute([$title, $slug, $notes_md, $season, $number, $ep_type, $status, $transcript_url, $chapters_url, $audio_url, $audio_bytes, $duration_secs, $cover_url, $publish_at, $published_at, $persons_json, $premium, $ep['id']]);
+      $pdo->prepare("UPDATE episodes SET title=?, slug=?, notes_md=?, season=?, number=?, ep_type=?, status=?, transcript_url=?, chapters_url=?, audio_url=?, audio_bytes=?, duration_secs=?, cover=?, publish_at=?, published_at=?, persons_json=?, premium=?, location_name=?, lat=?, lon=?, updated_at=datetime('now') WHERE id=?")
+          ->execute([$title, $slug, $notes_md, $season, $number, $ep_type, $status, $transcript_url, $chapters_url, $audio_url, $audio_bytes, $duration_secs, $cover_url, $publish_at, $published_at, $persons_json, $premium, $location_name, $lat, $lon, $ep['id']]);
       $episode_id = $ep['id'];
       $was_published = $ep['status'] === 'published';
   } else {
       $published_at = ($status === 'published') ? ($publish_at ?: gmdate('Y-m-d H:i:s')) : null;
-      $pdo->prepare("INSERT INTO episodes (podcast_id, guid, title, slug, notes_md, season, number, ep_type, status, transcript_url, chapters_url, audio_url, audio_bytes, duration_secs, cover, publish_at, published_at, persons_json, premium) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-          ->execute([$real_podcast_id, bin2hex(random_bytes(8)), $title, $slug, $notes_md, $season, $number, $ep_type, $status, $transcript_url, $chapters_url, $audio_url, $audio_bytes, $duration_secs, $cover_url, $publish_at, $published_at, $persons_json, $premium]);
+      $pdo->prepare("INSERT INTO episodes (podcast_id, guid, title, slug, notes_md, season, number, ep_type, status, transcript_url, chapters_url, audio_url, audio_bytes, duration_secs, cover, publish_at, published_at, persons_json, premium, location_name, lat, lon) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          ->execute([$real_podcast_id, bin2hex(random_bytes(8)), $title, $slug, $notes_md, $season, $number, $ep_type, $status, $transcript_url, $chapters_url, $audio_url, $audio_bytes, $duration_secs, $cover_url, $publish_at, $published_at, $persons_json, $premium, $location_name, $lat, $lon]);
       $episode_id = (int)$pdo->lastInsertId();
   }
 
@@ -424,8 +435,8 @@ $sections = [
           </div>
         </div>
         <div class="field-row" style="margin-top:14px">
-          <div class="field"><label class="label">Ubicación del episodio</label><input class="input" name="ep_location" placeholder="Caracas, Venezuela · OSM:R3489866"></div>
-          <div class="field"><label class="label">Lat, Lon</label><input class="input tabular" name="ep_latlon" placeholder="10.4806, -66.9036"></div>
+          <div class="field"><label class="label">Ubicación del episodio</label><input class="input" name="ep_location" value="<?= e($ep['location_name'] ?? '') ?>" placeholder="Caracas, Venezuela"></div>
+          <div class="field"><label class="label">Lat, Lon</label><input class="input tabular" name="ep_latlon" value="<?= (!empty($ep['lat']) && !empty($ep['lon'])) ? e($ep['lat'] . ', ' . $ep['lon']) : '' ?>" placeholder="10.4806, -66.9036"></div>
         </div>
       </section>
 

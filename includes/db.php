@@ -303,11 +303,50 @@ function kp_db(): PDO {
       $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '8') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
     } catch (Throwable $e) {}
   }
+
+  if ($current_version < 9) {
+    // Versión 9: Columna license para Podcasting 2.0
+    try {
+      $pdo->exec("ALTER TABLE podcasts ADD COLUMN license TEXT");
+    } catch (Throwable $e) {}
+
+    // Guardar versión de esquema en settings
+    try {
+      $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '9') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
+    } catch (Throwable $e) {}
+  }
+
+  if ($current_version < 10) {
+    // Versión 10: Columna update_frequency para Podcasting 2.0
+    try {
+      $pdo->exec("ALTER TABLE podcasts ADD COLUMN update_frequency TEXT");
+    } catch (Throwable $e) {}
+
+    // Guardar versión de esquema en settings
+    try {
+      $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '10') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
+    } catch (Throwable $e) {}
+  }
+
+  if ($current_version < 11) {
+    // Versión 11: Normalización de tipos de alertas (downloads, milestones) e índices de consulta
+    try {
+      $pdo->exec("UPDATE alerts SET kind = 'milestones' WHERE kind = 'op3' AND (title LIKE '%alcanzadas%' OR title LIKE '%meta%')");
+      $pdo->exec("UPDATE alerts SET kind = 'downloads' WHERE kind = 'op3'");
+      $pdo->exec("CREATE INDEX IF NOT EXISTS idx_alerts_kind_read ON alerts(kind, read_at)");
+    } catch (Throwable $e) {}
+
+    // Guardar versión de esquema en settings
+    try {
+      $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '11') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
+    } catch (Throwable $e) {}
+  }
   
   return $pdo;
 }
 }
 
+if (!function_exists('kp_q')) {
 function kp_q(string $sql, array $params = []): array {
   $st = kp_db()->prepare($sql); $st->execute($params);
   return $st->fetchAll();
@@ -319,4 +358,5 @@ function kp_one(string $sql, array $params = []): ?array {
 function kp_exec(string $sql, array $params = []): int {
   $st = kp_db()->prepare($sql); $st->execute($params);
   return (int) kp_db()->lastInsertId();
+}
 }

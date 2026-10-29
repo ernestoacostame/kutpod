@@ -55,7 +55,7 @@ if (!$p) {
           <?php if (!empty($active_podcasts)): ?>
             <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:20px;">
               <?php foreach ($active_podcasts as $show): ?>
-                <div class="pub-card" style="display:flex; flex-direction:column; padding:20px; border:1px solid var(--pub-border); border-radius:14px; background:var(--pub-card-bg, #fff);">
+                <div class="pub-card" style="display:flex; flex-direction:column; padding:20px; border:1px solid var(--pub-border); border-radius:14px; background:var(--pub-surface); color:var(--pub-text);">
                   <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
                     <?php if (!empty($show['cover'])): ?>
                       <img src="<?= e($show['cover']) ?>" alt="" style="width:56px; height:56px; border-radius:10px; object-fit:cover; flex-shrink:0;">
@@ -65,12 +65,12 @@ if (!$p) {
                       </div>
                     <?php endif; ?>
                     <div style="min-width:0; flex:1;">
-                      <div style="font-weight:600; font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; letter-spacing:-0.01em;"><?= e($show['title']) ?></div>
+                      <div style="font-weight:600; font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; letter-spacing:-0.01em; color:var(--pub-text);"><?= e($show['title']) ?></div>
                       <div style="font-size:12.5px; color:var(--pub-muted); margin-top:2px;"><?= (int)$show['episodes'] ?> episodios · <?= e($show['cat']) ?></div>
                     </div>
                   </div>
                   <div style="margin-top:auto; display:flex; gap:10px; padding-top:10px; border-top:1px solid var(--pub-border);">
-                    <a href="/@<?= e($show['id']) ?>" class="pub-btn pub-btn-ghost" style="flex:1; justify-content:center; font-size:13px; text-decoration:none;">Ver show</a>
+                    <a href="/@<?= e($show['id']) ?>" class="pub-btn pub-btn-ghost" style="flex:1; justify-content:center; font-size:13px; text-decoration:none; color:var(--pub-text);">Ver show</a>
                     <a href="/@<?= e($show['id']) ?>/feed.xml" class="pub-btn pub-btn-primary" style="font-size:13px; padding:6px 14px; display:inline-flex; align-items:center; gap:6px; text-decoration:none;" target="_blank"><?= icon('rss', 13) ?> Feed RSS</a>
                   </div>
                 </div>

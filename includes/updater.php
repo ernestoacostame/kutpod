@@ -12,6 +12,7 @@ require_once __DIR__ . '/../version.php';
 // ---------------------------------------------------------------------------
 // Configuración
 // ---------------------------------------------------------------------------
+define('KUTPOD_UPDATE_SERVER', 'https://kutstudio.com/updates/');
 define('KUTPOD_UPDATE_REPO', 'ernestoacostame/KutStudio');
 define('KUTPOD_UPDATE_SUBDIR', 'kutpod'); // Subcarpeta dentro del ZIP del repo
 
@@ -26,18 +27,97 @@ function kp_update_dir(): string {
 // ---------------------------------------------------------------------------
 function kp_update_check(): ?array {
   $token = kp_setting('update_github_token', '');
-  if (!$token) return ['error' => 'No se ha configurado el token de GitHub. Ve a Preferencias → Actualizaciones.'];
+  $localVersion = KUTPOD_VERSION;
 
-  $url = 'https://api.github.com/repos/' . KUTPOD_UPDATE_REPO . '/releases/latest';
+  // 1. Modo Desarrollo / Directo: Si el usuario configuró un token de GitHub explícito
+  if (!empty($token)) {
+    $url = 'https://api.github.com/repos/' . KUTPOD_UPDATE_REPO . '/releases/latest';
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_HTTPHEADER => [
+        "Authorization: Bearer $token",
+        'Accept: application/vnd.github+json',
+        'X-GitHub-Api-Version: 2022-11-28',
+      ],
+      CURLOPT_USERAGENT => 'KutPod/' . KUTPOD_VERSION,
+      CURLOPT_TIMEOUT => 15,
+    ]);
+    $resp = curl_exec($ch);
+    $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
+
+    if ($http === 401 || $http === 403) {
+      return ['error' => 'Token de GitHub de desarrollo inválido o sin permisos. HTTP ' . $http];
+    }
+    if ($http !== 200 || !$resp) {
+      return ['error' => "Error al consultar GitHub directamente (HTTP $http). $err"];
+    }
+
+    $release = json_decode($resp, true);
+    if (!$release || empty($release['tag_name'])) {
+      return ['error' => 'No se encontraron releases en el repositorio de GitHub.'];
+    }
+
+    $remoteVersion = ltrim($release['tag_name'], 'vV');
+
+    if (version_compare($remoteVersion, $localVersion, '<=')) {
+      kp_update_save_cache(['up_to_date' => true, 'version' => $localVersion]);
+      return ['up_to_date' => true, 'version' => $localVersion];
+    }
+
+    $zipUrl = '';
+    $zipIsAsset = false;
+    if (!empty($release['assets'])) {
+      foreach ($release['assets'] as $asset) {
+        if (preg_match('/^kutpod.*\.zip$/i', $asset['name'])) {
+          $zipUrl = $asset['url'];
+          $zipIsAsset = true;
+          break;
+        }
+      }
+      if (!$zipUrl) {
+        foreach ($release['assets'] as $asset) {
+          if (preg_match('/\.zip$/i', $asset['name'])) {
+            $zipUrl = $asset['url'];
+            $zipIsAsset = true;
+            break;
+          }
+        }
+      }
+    }
+    if (!$zipUrl) {
+      $zipUrl = $release['zipball_url'] ?? '';
+    }
+
+    $result = [
+      'available' => true,
+      'channel' => 'github_direct',
+      'current_version' => $localVersion,
+      'new_version' => $remoteVersion,
+      'tag' => $release['tag_name'],
+      'name' => $release['name'] ?? $release['tag_name'],
+      'changelog' => $release['body'] ?? '',
+      'published_at' => $release['published_at'] ?? '',
+      'zip_url' => $zipUrl,
+      'zip_is_asset' => $zipIsAsset,
+      'html_url' => $release['html_url'] ?? '',
+    ];
+
+    kp_update_save_cache($result);
+    return $result;
+  }
+
+  // 2. Modo Estándar Transparente: Servidor Central de Actualizaciones KutStudio
+  $server = rtrim(defined('KUTPOD_UPDATE_SERVER') ? KUTPOD_UPDATE_SERVER : 'https://kutstudio.com/updates/', '/');
+  $url = $server . '/?app=kutpod&action=check&version=' . rawurlencode($localVersion);
+
   $ch = curl_init($url);
   curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => [
-      "Authorization: Bearer $token",
-      'Accept: application/vnd.github+json',
-      'X-GitHub-Api-Version: 2022-11-28',
-    ],
     CURLOPT_USERAGENT => 'KutPod/' . KUTPOD_VERSION,
+    CURLOPT_FOLLOWLOCATION => true,
     CURLOPT_TIMEOUT => 15,
   ]);
   $resp = curl_exec($ch);
@@ -45,74 +125,26 @@ function kp_update_check(): ?array {
   $err = curl_error($ch);
   curl_close($ch);
 
-  if ($http === 401 || $http === 403) {
-    return ['error' => 'Token de GitHub inválido o sin permisos. HTTP ' . $http];
-  }
   if ($http !== 200 || !$resp) {
-    return ['error' => "Error al consultar GitHub (HTTP $http). $err"];
+    return ['error' => 'No se pudo conectar con el servidor de actualizaciones KutStudio. ' . ($err ?: "HTTP $http")];
   }
 
-  $release = json_decode($resp, true);
-  if (!$release || empty($release['tag_name'])) {
-    return ['error' => 'No se encontraron releases en el repositorio.'];
+  $data = json_decode($resp, true);
+  if (!$data) {
+    return ['error' => 'Respuesta no válida del servidor de actualizaciones.'];
+  }
+  if (!empty($data['error'])) {
+    return ['error' => $data['error']];
   }
 
-  $remoteVersion = ltrim($release['tag_name'], 'vV');
-  $localVersion = KUTPOD_VERSION;
-
-  if (version_compare($remoteVersion, $localVersion, '<=')) {
-    // Guardar en cache que estamos al día
+  if (!empty($data['up_to_date'])) {
     kp_update_save_cache(['up_to_date' => true, 'version' => $localVersion]);
     return ['up_to_date' => true, 'version' => $localVersion];
   }
 
-  // Buscar un asset ZIP personalizado de KutPod (kutpod-*.zip)
-  // Este tiene prioridad sobre el zipball_url (que incluiría todo el monorepo)
-  $zipUrl = '';
-  $zipIsAsset = false;
-  if (!empty($release['assets'])) {
-    foreach ($release['assets'] as $asset) {
-      // Priorizar: kutpod-vX.Y.Z.zip o kutpod.zip
-      if (preg_match('/^kutpod.*\.zip$/i', $asset['name'])) {
-        // Para repos privados, usar la API URL con Accept: octet-stream
-        $zipUrl = $asset['url'];
-        $zipIsAsset = true;
-        break;
-      }
-    }
-    // Fallback: cualquier .zip adjunto
-    if (!$zipUrl) {
-      foreach ($release['assets'] as $asset) {
-        if (preg_match('/\.zip$/i', $asset['name'])) {
-          $zipUrl = $asset['url'];
-          $zipIsAsset = true;
-          break;
-        }
-      }
-    }
-  }
-  // Último recurso: zipball del repo completo (monorepo)
-  if (!$zipUrl) {
-    $zipUrl = $release['zipball_url'] ?? '';
-  }
-
-  $result = [
-    'available' => true,
-    'current_version' => $localVersion,
-    'new_version' => $remoteVersion,
-    'tag' => $release['tag_name'],
-    'name' => $release['name'] ?? $release['tag_name'],
-    'changelog' => $release['body'] ?? '',
-    'published_at' => $release['published_at'] ?? '',
-    'zip_url' => $zipUrl,
-    'zip_is_asset' => $zipIsAsset,
-    'html_url' => $release['html_url'] ?? '',
-  ];
-
-  // Guardar en cache para el dashboard
-  kp_update_save_cache($result);
-
-  return $result;
+  $data['channel'] = 'kutstudio';
+  kp_update_save_cache($data);
+  return $data;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,8 +173,6 @@ function kp_update_cache_stale(): bool {
 // Descargar el ZIP de la release
 // ---------------------------------------------------------------------------
 function kp_update_download(string $zipUrl): array {
-  $token = kp_setting('update_github_token', '');
-  if (!$token) return ['error' => 'Token no configurado.'];
   if (!$zipUrl) return ['error' => 'URL del ZIP no disponible.'];
 
   $destDir = kp_update_dir();
@@ -151,18 +181,32 @@ function kp_update_download(string $zipUrl): array {
   $fp = fopen($destPath, 'w');
   if (!$fp) return ['error' => 'No se puede escribir en ' . $destDir];
 
+  $headers = [
+    'User-Agent: KutPod/' . KUTPOD_VERSION,
+  ];
+
+  // Si la descarga es directamente desde api.github.com, requerir y adjuntar el token
+  $isGitHubApi = (strpos($zipUrl, 'api.github.com') !== false);
+  if ($isGitHubApi) {
+    $token = kp_setting('update_github_token', '');
+    if (!$token) {
+      fclose($fp);
+      @unlink($destPath);
+      return ['error' => 'Se requiere token de GitHub para descargar directamente desde la API privada de GitHub.'];
+    }
+    $headers[] = "Authorization: Bearer $token";
+    $headers[] = 'Accept: application/octet-stream';
+    $headers[] = 'X-GitHub-Api-Version: 2022-11-28';
+  }
+
   $ch = curl_init($zipUrl);
   curl_setopt_array($ch, [
     CURLOPT_FILE => $fp,
-    CURLOPT_HTTPHEADER => [
-      "Authorization: Bearer $token",
-      'Accept: application/octet-stream',
-      'X-GitHub-Api-Version: 2022-11-28',
-    ],
+    CURLOPT_HTTPHEADER => $headers,
     CURLOPT_USERAGENT => 'KutPod/' . KUTPOD_VERSION,
     CURLOPT_FOLLOWLOCATION => true,
     CURLOPT_MAXREDIRS => 5,
-    CURLOPT_TIMEOUT => 120,
+    CURLOPT_TIMEOUT => 300,
   ]);
   curl_exec($ch);
   $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);

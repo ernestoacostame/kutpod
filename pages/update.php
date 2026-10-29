@@ -35,10 +35,10 @@ try {
 <!-- Estado actual -->
 <div class="stat-grid">
   <?= stat_card('Versión instalada', 'v' . KUTPOD_VERSION, 'layers', ['sub' => 'Compilación actual']) ?>
-  <?= stat_card('Token GitHub', $hasToken ? 'Configurado' : 'No configurado', 'shield',
+  <?= stat_card('Canal', $hasToken ? 'GitHub Directo' : 'KutStudio Cloud', 'shield',
        $hasToken
-         ? ['sub' => 'Listo para buscar']
-         : ['sub' => 'No configurado aún', 'foot' => '<div style="margin-top:8px"><a href="/admin/preferences#update-token" style="color:var(--accent);font-size:12px">Configurar en Preferencias →</a></div>']) ?>
+         ? ['sub' => 'Token de desarrollo activo', 'foot' => '<div style="margin-top:8px"><a href="/admin/preferences#update-token" style="color:var(--accent);font-size:12px">Preferencias →</a></div>']
+         : ['sub' => 'Actualización transparente', 'foot' => '<div style="margin-top:8px;font-size:11px;color:var(--text-3)">Automático</div>']) ?>
   <?= stat_card('Rollback', $hasRollback ? 'v' . $rollbackVersion : 'No disponible', 'refreshCw',
        ['sub' => $hasRollback ? 'Versión anterior guardada' : 'Se crea antes de cada update']) ?>
   <?= stat_card('Actualizaciones', (string)count($history), 'check', ['sub' => 'aplicadas en total']) ?>
@@ -50,10 +50,10 @@ try {
     <div>
       <div class="card-title">Buscar actualización</div>
       <div style="font-size:12.5px;color:var(--text-3);margin-top:4px">
-        Consulta el repositorio de GitHub para verificar si hay una nueva versión disponible.
+        Consulta el repositorio oficial para verificar si hay una nueva versión disponible.
       </div>
     </div>
-    <button class="btn btn-primary" id="btn-check" type="button" onclick="kpUpdateCheck()" <?= $hasToken ? '' : 'disabled title="Configura el token primero"' ?>>
+    <button class="btn btn-primary" id="btn-check" type="button" onclick="kpUpdateCheck()">
       <?= icon('search',13) ?> Buscar actualizaciones
     </button>
   </div>

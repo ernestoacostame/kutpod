@@ -46,9 +46,9 @@ switch ($action) {
       break;
     }
 
-    // Validar que la URL pertenezca a GitHub/repositorio autorizado
-    if (!preg_match('#^https://(?:api\.)?github\.com/#i', $zipUrl)) {
-      echo json_encode(['error' => 'URL de descarga no válida. Solo se permiten URLs de GitHub.']);
+    // Validar que la URL pertenezca a GitHub o al servidor oficial KutStudio
+    if (!preg_match('#^https://(?:(?:api\.)?github\.com/|(?:www\.)?kutstudio\.(?:org|com)/)#i', $zipUrl)) {
+      echo json_encode(['error' => 'URL de descarga no válida. Solo se permiten URLs oficiales de GitHub o KutStudio.']);
       break;
     }
 

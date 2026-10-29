@@ -90,6 +90,7 @@ $durationFmt = $ep['duration'] ?: ($durationSecs > 0 ? kp_fmt_duration($duration
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
+      color-scheme: light;
       --accent: <?= e($accent) ?>;
       --bg: #ffffff;
       --card-bg: #f8fafc;
@@ -98,10 +99,13 @@ $durationFmt = $ep['duration'] ?: ($durationSecs > 0 ? kp_fmt_duration($duration
       --border: #e2e8f0;
       --scrub-bg: #cbd5e1;
       --hover-bg: #f1f5f9;
+      --speed-bg: #f1f5f9;
+      --speed-border: #cbd5e1;
     }
 
     @media (prefers-color-scheme: dark) {
       :root[data-theme="auto"] {
+        color-scheme: dark;
         --bg: #090d16;
         --card-bg: #0f172a;
         --text: #f8fafc;
@@ -109,10 +113,14 @@ $durationFmt = $ep['duration'] ?: ($durationSecs > 0 ? kp_fmt_duration($duration
         --border: rgba(255, 255, 255, 0.08);
         --scrub-bg: rgba(255, 255, 255, 0.15);
         --hover-bg: rgba(255, 255, 255, 0.08);
+        --speed-bg: #1e293b;
+        --speed-border: rgba(255, 255, 255, 0.14);
       }
     }
 
-    :root[data-theme="dark"] {
+    :root[data-theme="dark"],
+    html[data-theme="dark"] {
+      color-scheme: dark;
       --bg: #090d16;
       --card-bg: #0f172a;
       --text: #f8fafc;
@@ -120,6 +128,8 @@ $durationFmt = $ep['duration'] ?: ($durationSecs > 0 ? kp_fmt_duration($duration
       --border: rgba(255, 255, 255, 0.08);
       --scrub-bg: rgba(255, 255, 255, 0.15);
       --hover-bg: rgba(255, 255, 255, 0.08);
+      --speed-bg: #1e293b;
+      --speed-border: rgba(255, 255, 255, 0.14);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -340,15 +350,38 @@ $durationFmt = $ep['duration'] ?: ($durationSecs > 0 ? kp_fmt_duration($duration
     }
 
     .kp-embed-speed {
-      background: var(--hover-bg);
-      border: 1px solid var(--border);
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      background-color: var(--speed-bg);
+      border: 1px solid var(--speed-border);
       color: var(--text);
+      font-family: inherit;
       font-size: 11px;
       font-weight: 600;
-      padding: 4px 6px;
+      padding: 4px 18px 4px 7px;
       border-radius: 6px;
       cursor: pointer;
       outline: none;
+      color-scheme: light dark;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 5px center;
+      background-size: 9px;
+      transition: all 0.15s ease;
+    }
+
+    .kp-embed-speed:hover,
+    .kp-embed-speed:focus-visible {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .kp-embed-speed option {
+      background-color: var(--card-bg);
+      color: var(--text);
+      font-size: 12px;
+      padding: 6px 10px;
     }
 
     @media (max-width: 480px) {

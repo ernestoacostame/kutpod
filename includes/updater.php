@@ -12,7 +12,7 @@ require_once __DIR__ . '/../version.php';
 // ---------------------------------------------------------------------------
 // Configuración
 // ---------------------------------------------------------------------------
-define('KUTPOD_UPDATE_SERVER', 'https://kutstudio.com/updates/');
+define('KUTPOD_UPDATE_SERVER', 'https://kutstudio.org/updates/');
 define('KUTPOD_UPDATE_REPO', 'ernestoacostame/KutStudio');
 define('KUTPOD_UPDATE_SUBDIR', 'kutpod'); // Subcarpeta dentro del ZIP del repo
 

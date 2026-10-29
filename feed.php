@@ -31,13 +31,63 @@ if ($p) {
     }
 }
 
-// 3. Si no existe, redirigir o mostrar 404
+// 3. Si no existe, redirigir o mostrar 404 / página con podcasts activos
 if (!$p) {
     if (preg_match('#^/feed/#i', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH))) {
         header('Location: /feed/' . rawurlencode($slug), true, 302);
         exit;
     }
     http_response_code(404);
+    $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+    if (str_contains($accept, 'text/html')) {
+        $active_podcasts = kp_podcasts();
+        $title = 'Feed no especificado';
+        ob_start();
+        ?>
+        <div class="pub-container" style="padding:60px 24px 80px; max-width:860px; margin:0 auto;">
+          <div style="text-align:center; margin-bottom:44px;">
+            <div style="font-size:48px; margin-bottom:16px; color:var(--pub-muted); line-height:1;"><?= icon('rss', 48) ?></div>
+            <h1 style="font-size:28px; font-weight:700; margin-bottom:12px; letter-spacing:-0.02em;">Feed RSS no especificado</h1>
+            <p style="font-size:15px; color:var(--pub-muted); line-height:1.6; max-width:560px; margin:0 auto;">
+              Esta plataforma aloja múltiples podcasts independientes. Cada programa cuenta con su propio canal RSS para suscribirte en tu reproductor favorito:
+            </p>
+          </div>
+          <?php if (!empty($active_podcasts)): ?>
+            <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:20px;">
+              <?php foreach ($active_podcasts as $show): ?>
+                <div class="pub-card" style="display:flex; flex-direction:column; padding:20px; border:1px solid var(--pub-border); border-radius:14px; background:var(--pub-card-bg, #fff);">
+                  <div style="display:flex; align-items:center; gap:14px; margin-bottom:14px;">
+                    <?php if (!empty($show['cover'])): ?>
+                      <img src="<?= e($show['cover']) ?>" alt="" style="width:56px; height:56px; border-radius:10px; object-fit:cover; flex-shrink:0;">
+                    <?php else: ?>
+                      <div style="width:56px; height:56px; border-radius:10px; background:linear-gradient(135deg,<?= e($show['color']) ?>,<?= e($show['color']) ?>aa); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:20px; flex-shrink:0;">
+                        <?= e($show['initial']) ?>
+                      </div>
+                    <?php endif; ?>
+                    <div style="min-width:0; flex:1;">
+                      <div style="font-weight:600; font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; letter-spacing:-0.01em;"><?= e($show['title']) ?></div>
+                      <div style="font-size:12.5px; color:var(--pub-muted); margin-top:2px;"><?= (int)$show['episodes'] ?> episodios · <?= e($show['cat']) ?></div>
+                    </div>
+                  </div>
+                  <div style="margin-top:auto; display:flex; gap:10px; padding-top:10px; border-top:1px solid var(--pub-border);">
+                    <a href="/@<?= e($show['id']) ?>" class="pub-btn pub-btn-ghost" style="flex:1; justify-content:center; font-size:13px; text-decoration:none;">Ver show</a>
+                    <a href="/@<?= e($show['id']) ?>/feed.xml" class="pub-btn pub-btn-primary" style="font-size:13px; padding:6px 14px; display:inline-flex; align-items:center; gap:6px; text-decoration:none;" target="_blank"><?= icon('rss', 13) ?> Feed RSS</a>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          <?php else: ?>
+            <div style="text-align:center;">
+              <a href="/shows" class="pub-btn pub-btn-primary" style="display:inline-flex; align-items:center; gap:8px;">Ver catálogo de podcasts</a>
+            </div>
+          <?php endif; ?>
+        </div>
+        <?php
+        $body = ob_get_clean();
+        require_once __DIR__ . '/includes/public-layout.php';
+        exit;
+    }
+    header('Content-Type: text/plain; charset=utf-8');
     exit('Feed no encontrado');
 }
 

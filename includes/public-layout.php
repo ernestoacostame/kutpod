@@ -44,6 +44,9 @@ $canonical_url = $og_url ?? ($current_protocol . '://' . $current_host . strtok(
 <?php endif; ?>
 
 <link rel="canonical" href="<?= e($canonical_url) ?>"/>
+<?php if (!empty($p['slug'])): ?>
+<link rel="alternate" type="application/rss+xml" title="Feed RSS <?= e($p['title'] ?? '') ?>" href="/@<?= e($p['slug']) ?>/feed.xml"/>
+<?php endif; ?>
 <meta name="description" content="<?= e($og_description ?? $inst['tagline'] ?? '') ?>"/>
 <meta name="robots" content="index, follow"/>
 <?php if (!empty($og_jsonld)): ?>
@@ -108,6 +111,8 @@ if ($masto_url) {
           }
           if (kp_current_user()): ?>
             <a class="pub-btn pub-btn-ghost" href="/admin">Studio →</a>
+          <?php else: ?>
+            <a class="pub-btn pub-btn-ghost" href="/admin" title="Panel de Administración">Admin</a>
           <?php endif; ?>
         </div>
       </div>
@@ -129,6 +134,8 @@ if ($masto_url) {
       }
       if (kp_current_user()): ?>
         <a class="pub-btn pub-btn-ghost" href="/admin">Studio →</a>
+      <?php else: ?>
+        <a class="pub-btn pub-btn-ghost" href="/admin" title="Panel de Administración">Admin</a>
       <?php endif; ?>
     </div>
   </div>
@@ -164,7 +171,7 @@ if ($masto_url) {
       </div>
     </div>
     <div class="row" style="justify-content:space-between;border-top:1px solid var(--pub-border);padding-top:24px;margin-top:40px;font-size:12px;color:var(--pub-muted)">
-      <span>© <?= e($inst['year']) ?><?= $inst['owner'] ? ' ' . e($inst['owner']) : '' ?>. Hecho con KutPod. · <a href="/admin" style="color:inherit;text-decoration:none">Acceder</a></span><span>v<?= defined('KUTPOD_VERSION') ? KUTPOD_VERSION : '0.4.2' ?></span>
+      <span>© <?= e($inst['year']) ?><?= $inst['owner'] ? ' ' . e($inst['owner']) : '' ?>. Hecho con KutPod. · <a href="/admin" style="color:inherit;text-decoration:none">Administración</a></span><span>v<?= defined('KUTPOD_VERSION') ? KUTPOD_VERSION : '0.4.2' ?></span>
     </div>
   </div></footer>
 </div>

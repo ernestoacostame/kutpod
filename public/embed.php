@@ -564,10 +564,14 @@ $durationFmt = $ep['duration'] ?: ($durationSecs > 0 ? kp_fmt_duration($duration
         scrubber.classList.remove('dragging');
       });
 
-      // Soporte postMessage desde KutBlog (saltos de capítulos y timestamps)
+      // Soporte postMessage desde KutBlog (reproducción, pausas, saltos de capítulos y timestamps)
       window.addEventListener('message', (event) => {
         if (!event.data || typeof event.data !== 'object') return;
-        if (event.data.action === 'seek') {
+        if (event.data.action === 'play') {
+          if (audio.paused) audio.play().catch(() => {});
+        } else if (event.data.action === 'pause') {
+          audio.pause();
+        } else if (event.data.action === 'seek') {
           const time = parseFloat(event.data.time);
           if (!isNaN(time) && isFinite(time)) {
             audio.currentTime = Math.max(0, Math.min(audio.duration || time, time));
@@ -575,6 +579,24 @@ $durationFmt = $ep['duration'] ?: ($durationSecs > 0 ? kp_fmt_duration($duration
           }
         }
       });
+
+      // Soporte parámetro ?autoplay=1 o ?autoplay=true
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('autoplay') === '1' || urlParams.get('autoplay') === 'true') {
+        const tryPlay = () => {
+          const p = audio.play();
+          if (p !== undefined) {
+            p.catch(err => {
+              console.warn('[KutPod Embed] Autoplay no permitido por política del navegador:', err);
+            });
+          }
+        };
+        if (audio.readyState >= 2) {
+          tryPlay();
+        } else {
+          audio.addEventListener('canplay', tryPlay, { once: true });
+        }
+      }
     })();
   </script>
 </body>

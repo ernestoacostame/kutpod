@@ -111,7 +111,7 @@ function kp_update_check(): ?array {
 
   // 2. Modo Estándar Transparente: Servidor Central de Actualizaciones KutStudio
   $server = rtrim(defined('KUTPOD_UPDATE_SERVER') ? KUTPOD_UPDATE_SERVER : 'https://kutstudio.com/updates/', '/');
-  $url = $server . '/?app=kutpod&action=check&version=' . rawurlencode($localVersion);
+  $url = $server . '/?app=kutpod&action=check&version=' . rawurlencode($localVersion) . '&nocache=1';
 
   $ch = curl_init($url);
   curl_setopt_array($ch, [

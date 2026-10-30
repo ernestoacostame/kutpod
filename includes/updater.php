@@ -343,6 +343,52 @@ function kp_update_apply(string $zipPath, string $newVersion): array {
   return ['success' => true, 'from' => KUTPOD_VERSION, 'to' => $newVersion, 'files_updated' => $copied];
 }
 
+/**
+ * Aplica una actualización desde un archivo ZIP local (manual o descargado)
+ * detectando automáticamente la nueva versión desde version.php dentro del ZIP.
+ */
+function kp_update_apply_zip(string $zipPath, ?string $manualVersion = null): array {
+  if (!file_exists($zipPath)) return ['error' => 'El fichero ZIP no existe.'];
+  if (!class_exists('ZipArchive')) return ['error' => 'La extensión ZipArchive de PHP no está instalada.'];
+
+  $zip = new ZipArchive();
+  $res = $zip->open($zipPath);
+  if ($res !== true) {
+    @unlink($zipPath);
+    return ['error' => 'No se pudo abrir el archivo ZIP (código: ' . $res . '). Verifica que sea un archivo ZIP válido.'];
+  }
+
+  // Buscar version.php dentro del ZIP para auto-detectar la versión
+  $detectedVersion = '';
+  for ($i = 0; $i < $zip->numFiles; $i++) {
+    $stat = $zip->statIndex($i);
+    $name = $stat['name'] ?? '';
+    if (preg_match('#(?:^|/)version\.php$#i', $name)) {
+      $content = $zip->getFromIndex($i);
+      if ($content && preg_match("/KUTPOD_VERSION',\s*'([^']+)'/", $content, $m)) {
+        $detectedVersion = trim($m[1]);
+        break;
+      }
+    }
+  }
+  $zip->close();
+
+  $versionToApply = $manualVersion ?: $detectedVersion;
+  if (!$versionToApply) {
+    // Si no se encontró version.php, intentar extraer del nombre de archivo (ej: kutpod-v1.2.16.zip)
+    if (preg_match('/(?:v|kutpod-v?)([0-9]+\.[0-9]+\.[0-9]+)/i', basename($zipPath), $vm)) {
+      $versionToApply = $vm[1];
+    }
+  }
+
+  if (!$versionToApply) {
+    @unlink($zipPath);
+    return ['error' => 'No se pudo determinar la versión de KutPod dentro del ZIP. Asegúrate de subir un release oficial de KutPod que contenga version.php.'];
+  }
+
+  return kp_update_apply($zipPath, $versionToApply);
+}
+
 // ---------------------------------------------------------------------------
 // Rollback a la versión anterior
 // ---------------------------------------------------------------------------

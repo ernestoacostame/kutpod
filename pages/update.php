@@ -105,6 +105,32 @@ try {
   </div>
 </div>
 
+<!-- Actualización manual vía ZIP -->
+<div class="card card-lg" style="padding:28px;margin-top:24px" id="manual-upload-card">
+  <div class="card-head" style="margin-bottom:18px">
+    <div>
+      <div class="card-title"><?= icon('upload',16) ?> Subir paquete de actualización (.zip)</div>
+      <div style="font-size:12.5px;color:var(--text-3);margin-top:4px">
+        Si tu servidor no puede conectar a GitHub o prefieres actualizar manualmente, sube el archivo <code>.zip</code> descargado directamente desde los <a href="https://github.com/ernestoacostame/kutpod/releases" target="_blank" rel="noopener" style="color:var(--accent)">Releases de GitHub</a>.
+      </div>
+    </div>
+  </div>
+
+  <form id="form-manual-upload" onsubmit="kpManualUpdateUpload(event)">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+      <input type="file" id="manual-zip-input" accept=".zip,application/zip" class="input" style="flex:1;min-width:240px;padding:8px 12px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px" required>
+      <button class="btn btn-primary" id="btn-manual-upload" type="submit">
+        <?= icon('upload',13) ?> Subir e instalar actualización
+      </button>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-3);margin-top:8px">
+      ℹ Se creará una copia de seguridad automática antes de aplicar los ficheros del archivo ZIP.
+    </div>
+  </form>
+
+  <div id="manual-upload-status" style="display:none;margin-top:16px"></div>
+</div>
+
 <!-- Rollback -->
 <?php if ($hasAnyRollback): ?>
 <div class="card card-lg" style="padding:28px;margin-top:24px">
@@ -474,5 +500,78 @@ function kpCleanDownloads() {
         btn.innerHTML = '<?= icon('trash',13) ?> Borrar actualizaciones descargadas';
       }
     });
+}
+
+function kpManualUpdateUpload(e) {
+  e.preventDefault();
+  const fileInput = document.getElementById('manual-zip-input');
+  const btn = document.getElementById('btn-manual-upload');
+  const status = document.getElementById('manual-upload-status');
+
+  if (!fileInput.files || !fileInput.files[0]) {
+    alert('Por favor selecciona un archivo .zip.');
+    return;
+  }
+
+  const file = fileInput.files[0];
+  if (!file.name.toLowerCase().endsWith('.zip')) {
+    alert('El archivo seleccionado debe ser un .zip.');
+    return;
+  }
+
+  if (!confirm('¿Deseas aplicar la actualización manual desde "' + file.name + '"?\n\nSe creará un respaldo de seguridad previo de forma automática.')) {
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<?= icon('upload',13) ?> Instalando actualización...';
+  status.style.display = 'block';
+  status.innerHTML = '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:16px;color:var(--text-2);font-size:13.5px">'
+    + '<div style="font-weight:600;margin-bottom:4px">Subiendo e instalando paquete...</div>'
+    + '<div style="font-size:12px;color:var(--text-3)">Desempaquetando archivos, respaldando versión actual y sobrescribiendo core...</div>'
+    + '</div>';
+
+  const formData = new FormData();
+  formData.append('action', 'upload');
+  formData.append('zip_file', file);
+
+  fetch('/api/update', {
+    method: 'POST',
+    body: formData
+  })
+  .then(async r => {
+    const text = await r.text();
+    try {
+      return JSON.parse(text);
+    } catch(err) {
+      throw new Error('Respuesta inválida del servidor (HTTP ' + r.status + '): ' + text.substring(0, 150));
+    }
+  })
+  .then(data => {
+    if (data.error) {
+      status.innerHTML = '<div style="background:#ef444418;border:1px solid #ef444455;border-radius:10px;padding:16px;color:#ef4444;font-size:13.5px">'
+        + '<strong>❌ Error al actualizar:</strong><div style="margin-top:6px;font-size:13px">' + data.error + '</div>'
+        + '</div>';
+      btn.disabled = false;
+      btn.innerHTML = '<?= icon('upload',13) ?> Subir e instalar actualización';
+      return;
+    }
+
+    status.innerHTML = '<div style="background:#10b98118;border:1px solid #10b98155;border-radius:10px;padding:20px;color:#10b981;font-size:14px">'
+      + '<div style="font-size:16px;font-weight:700">🎉 ¡KutPod actualizado con éxito!</div>'
+      + '<div style="margin-top:6px;font-size:13px;color:var(--text-2)">Actualizado de v' + data.from + ' a <strong>v' + data.to + '</strong> (' + data.files_updated + ' ficheros copiados).</div>'
+      + '<div style="margin-top:14px"><button class="btn btn-primary" onclick="window.location.reload()">' + '<?= icon('refreshCw',13) ?> Recargar página' + '</button></div>'
+      + '</div>';
+    fileInput.value = '';
+    btn.disabled = false;
+    btn.innerHTML = '<?= icon('upload',13) ?> Subir e instalar actualización';
+  })
+  .catch(err => {
+    status.innerHTML = '<div style="background:#ef444418;border:1px solid #ef444455;border-radius:10px;padding:16px;color:#ef4444;font-size:13.5px">'
+      + '<strong>❌ Error de conexión:</strong><div style="margin-top:6px;font-size:13px">' + err.message + '</div>'
+      + '</div>';
+    btn.disabled = false;
+    btn.innerHTML = '<?= icon('upload',13) ?> Subir e instalar actualización';
+  });
 }
 </script>

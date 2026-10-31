@@ -578,11 +578,19 @@ function kp_plugin_is_active(string $plugin_id): bool {
       if (!is_array($active_plugins)) {
         $active_plugins = [];
       }
+      // Auto-migrar legacy brisacms -> kutblog
+      if (in_array('brisacms', $active_plugins, true)) {
+        $active_plugins = array_values(array_filter($active_plugins, fn($id) => $id !== 'brisacms'));
+        if (!in_array('kutblog', $active_plugins, true)) {
+          $active_plugins[] = 'kutblog';
+        }
+        kp_update_setting('active_plugins', json_encode($active_plugins));
+      }
     } catch (Throwable $e) {
       $active_plugins = [];
     }
   }
-  return in_array($plugin_id, $active_plugins, true);
+  return in_array($plugin_id, $active_plugins, true) || ($plugin_id === 'kutblog' && in_array('brisacms', $active_plugins, true));
 }
 
 // Cargar sistema de ganchos y plugins

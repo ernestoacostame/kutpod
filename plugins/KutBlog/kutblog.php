@@ -14,15 +14,15 @@ kp_add_action('episode_saved', 'kp_kutblog_on_saved', 10, 2);
 kp_add_action('episode_deleted', 'kp_kutblog_on_deleted', 10, 1);
 
 function kp_kutblog_is_configured(): bool {
-    $url = kp_setting('kutblog_webhook_url', '');
+    $url = kp_setting('kutblog_webhook_url', '') ?: kp_setting('brisacms_webhook_url', '');
     return !empty($url);
 }
 
 function kp_kutblog_send_webhook(string $event, array $episodeData): void {
     if (!kp_kutblog_is_configured()) return;
 
-    $url = kp_setting('kutblog_webhook_url', '');
-    $secret = kp_setting('kutblog_secret', '');
+    $url = kp_setting('kutblog_webhook_url', '') ?: kp_setting('brisacms_webhook_url', '');
+    $secret = kp_setting('kutblog_secret', '') ?: kp_setting('brisacms_secret', '');
 
     $payload = json_encode([
         'event'     => $event,

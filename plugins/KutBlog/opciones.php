@@ -21,8 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$webhookUrl = kp_setting('kutblog_webhook_url', '');
-$secret = kp_setting('kutblog_secret', '');
+$webhookUrl = kp_setting('kutblog_webhook_url', '') ?: kp_setting('brisacms_webhook_url', '');
+$secret = kp_setting('kutblog_secret', '') ?: kp_setting('brisacms_secret', '');
 
 ?>
 

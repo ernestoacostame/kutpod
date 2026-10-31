@@ -8,6 +8,9 @@
   --good: #4ade80;
   --bad: #f87171;
   --warn: #f5b942;
+  --red: #ef4444;
+  --red-10: rgba(239, 68, 68, 0.15);
+  --red-soft: rgba(239, 68, 68, 0.12);
   --radius-sm: 8px;
   --radius: 14px;
   --radius-lg: 22px;
@@ -476,8 +479,15 @@ input, textarea, select { font-family: inherit; color: inherit; }
   background: transparent; border-color: transparent; color: var(--text-2);
 }
 .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
-.btn-danger { color: var(--bad); }
-.btn-danger:hover { background: rgba(248, 113, 113, 0.08); border-color: rgba(248, 113, 113, 0.3); }
+.btn-danger {
+  color: var(--red, #ef4444);
+  border: 1px solid var(--red, #ef4444);
+}
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #dc2626;
+  color: #fca5a5;
+}
 
 /* Cards */
 .card {
@@ -1317,6 +1327,40 @@ input, textarea, select { font-family: inherit; color: inherit; }
   transition: width 120ms;
 }
 .recorder-time { font-size: 13px; color: var(--text-3); min-width: 56px; text-align: right; }
+
+/* KutFast-style circular record button */
+.rec-btn-circle {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: var(--red, #f06050);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 16px rgba(240, 96, 80, 0.4);
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s, border-radius .2s, background .2s;
+  outline: none;
+}
+.rec-btn-circle:hover {
+  transform: scale(1.06);
+  box-shadow: 0 6px 22px rgba(240, 96, 80, 0.55);
+}
+.rec-btn-circle:active {
+  transform: scale(0.95);
+}
+.rec-btn-circle.recording {
+  animation: recPulse 1.3s infinite;
+  border-radius: 18px;
+  background: #dc2626;
+}
+@keyframes recPulse {
+  0% { box-shadow: 0 0 0 0 rgba(240, 96, 80, 0.7); }
+  70% { box-shadow: 0 0 0 16px rgba(240, 96, 80, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(240, 96, 80, 0); }
+}
 
 /* Pages list (sidebar of /pages) */
 .page-list { display: flex; flex-direction: column; }

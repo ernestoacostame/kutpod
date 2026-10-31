@@ -214,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   kp_cache_clear();
 
   setcookie('kp_flash', 'Podcast guardado exitosamente', time() + 30, '/');
-  header('Location: /admin/podcasts'); exit;
+  header('Location: /admin/edit-podcast?id=' . urlencode($slug)); exit;
 }
 
 $sections = [
@@ -533,9 +533,12 @@ $sections = kp_apply_filters('podcast_form_sections', $sections);
       <div style="margin-top:32px;display:flex;flex-direction:column;gap:10px">
         <button class="btn btn-primary" type="submit" name="status" value="published" style="width:100%;justify-content:center;padding:10px"><?= icon('check',13) ?> Guardar</button>
         <button class="btn" type="submit" name="status" value="draft" formnovalidate style="width:100%;justify-content:center"><?= icon('file',13) ?> Guardar borrador</button>
+        <?php if ($mode === 'edit' && $p): ?>
+          <a class="btn" href="/@<?= e($p['slug'] ?? $p['id']) ?>" target="_blank" rel="noopener" style="width:100%;justify-content:center"><?= icon('externalLink',13) ?> Ir al Podcast</a>
+        <?php endif; ?>
         <a class="btn" href="/admin/podcasts" style="width:100%;justify-content:center">Cancelar</a>
         <?php if ($mode === 'edit'): ?>
-          <button class="btn" style="color:var(--red);border-color:var(--red-10);width:100%;justify-content:center" type="submit" name="action" value="delete" formnovalidate onclick="return confirm('¿Estás seguro de que quieres eliminar este podcast y TODOS sus episodios?')"><?= icon('x',13) ?> Eliminar</button>
+          <button class="btn btn-danger" style="color:var(--red,#ef4444);border:1px solid var(--red,#ef4444);width:100%;justify-content:center" type="submit" name="action" value="delete" formnovalidate onclick="return confirm('¿Estás seguro de que quieres eliminar este podcast y TODOS sus episodios?')"><?= icon('x',13) ?> Eliminar</button>
         <?php endif; ?>
       </div>
     </aside>

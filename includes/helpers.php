@@ -22,13 +22,16 @@ function kp_detect_lang(): string {
     kp_set_lang($_GET['lang']);
     return $_GET['lang'];
   }
-  // 2. Sesión
-  if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['kp_lang']) && in_array($_SESSION['kp_lang'], ['es', 'en'], true)) {
-    return $_SESSION['kp_lang'];
-  }
-  // 3. Cookie
+  // 2. Cookie explícita
   if (!empty($_COOKIE['kp_lang']) && in_array($_COOKIE['kp_lang'], ['es', 'en'], true)) {
     return $_COOKIE['kp_lang'];
+  }
+  // 3. Sesión
+  if (session_status() === PHP_SESSION_NONE && !headers_sent() && isset($_COOKIE[session_name()])) {
+    @session_start();
+  }
+  if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['kp_lang']) && in_array($_SESSION['kp_lang'], ['es', 'en'], true)) {
+    return $_SESSION['kp_lang'];
   }
   // 4. Ajuste guardado en la base de datos
   $dbLang = kp_setting('site_language');
@@ -62,7 +65,9 @@ function kp_set_lang(string $lang): void {
   $_COOKIE['kp_lang'] = $lang;
   if (!headers_sent()) {
     $isHttps = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ||
-               (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+               (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') ||
+               (isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] === 'https') ||
+               (isset($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443);
     setcookie('kp_lang', $lang, [
       'expires'  => time() + 31536000,
       'path'     => '/',

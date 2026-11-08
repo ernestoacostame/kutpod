@@ -136,8 +136,8 @@ $is_auth_page = in_array($page, ['login', 'login-2fa', 'forgot', 'reset', 'recov
       <div style="display:flex;align-items:center;gap:12px">
         <!-- Selector rápido de Idioma -->
         <div style="display:inline-flex;gap:4px;align-items:center;background:var(--surface-2, rgba(255,255,255,0.06));padding:3px 6px;border-radius:6px;font-size:11.5px;font-weight:700;">
-          <a href="?lang=es" style="color:var(--text-1, white);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $cur_lang === 'es' ? 'background:var(--accent);color:var(--bg-1, #000);' : 'opacity:0.6;' ?>">ES</a>
-          <a href="?lang=en" style="color:var(--text-1, white);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $cur_lang === 'en' ? 'background:var(--accent);color:var(--bg-1, #000);' : 'opacity:0.6;' ?>">EN</a>
+          <a href="?lang=es" onclick="document.cookie='kp_lang=es;path=/;max-age=31536000;SameSite=Lax'" style="color:var(--text-1, white);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $cur_lang === 'es' ? 'background:var(--accent);color:var(--bg-1, #000);' : 'opacity:0.6;' ?>">ES</a>
+          <a href="?lang=en" onclick="document.cookie='kp_lang=en;path=/;max-age=31536000;SameSite=Lax'" style="color:var(--text-1, white);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $cur_lang === 'en' ? 'background:var(--accent);color:var(--bg-1, #000);' : 'opacity:0.6;' ?>">EN</a>
         </div>
         <form class="search" action="<?= admin_url('search') ?>" method="GET" autocomplete="off" role="search">
           <label style="display:flex;align-items:center;gap:8px;width:100%;cursor:text">
@@ -152,8 +152,8 @@ $is_auth_page = in_array($page, ['login', 'login-2fa', 'forgot', 'reset', 'recov
     <?php else: ?>
     <!-- Selector rápido de idioma en páginas de acceso -->
     <div style="position:fixed;top:16px;right:16px;z-index:999;display:inline-flex;gap:4px;align-items:center;background:var(--surface-2, rgba(255,255,255,0.06));padding:3px 6px;border-radius:6px;font-size:11.5px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.2);">
-      <a href="?lang=es" style="color:var(--text-1, white);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $cur_lang === 'es' ? 'background:var(--accent);color:var(--bg-1, #000);' : 'opacity:0.6;' ?>">ES</a>
-      <a href="?lang=en" style="color:var(--text-1, white);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $cur_lang === 'en' ? 'background:var(--accent);color:var(--bg-1, #000);' : 'opacity:0.6;' ?>">EN</a>
+      <a href="?lang=es" onclick="document.cookie='kp_lang=es;path=/;max-age=31536000;SameSite=Lax'" style="color:var(--text-1, white);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $cur_lang === 'es' ? 'background:var(--accent);color:var(--bg-1, #000);' : 'opacity:0.6;' ?>">ES</a>
+      <a href="?lang=en" onclick="document.cookie='kp_lang=en;path=/;max-age=31536000;SameSite=Lax'" style="color:var(--text-1, white);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $cur_lang === 'en' ? 'background:var(--accent);color:var(--bg-1, #000);' : 'opacity:0.6;' ?>">EN</a>
     </div>
     <?php endif; ?>
     <?php if (!$is_auth_page && $page !== 'update'): ?>

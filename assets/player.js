@@ -293,6 +293,12 @@
     // Ignorar rutas del Studio (admin) o rutas de raw/feed
     if (a.pathname.startsWith('/admin') || a.pathname.startsWith('/r/') || a.pathname.endsWith('.xml')) return;
 
+    // Si es cambio de idioma, sincronizar cookie client-side de inmediato
+    const langMatch = a.search && a.search.match(/[?&]lang=(es|en)/i);
+    if (langMatch) {
+      document.cookie = `kp_lang=${langMatch[1].toLowerCase()}; path=/; max-age=31536000; SameSite=Lax`;
+    }
+
     e.preventDefault();
     try {
       const res = await fetch(a.href);
@@ -303,8 +309,40 @@
       const newBody = doc.querySelector('.pub-body');
       if (newBody) {
         document.querySelector('.pub-body').innerHTML = newBody.innerHTML;
+
+        const newHeader = doc.querySelector('.pub-header');
+        const curHeader = document.querySelector('.pub-header');
+        if (newHeader && curHeader) {
+          curHeader.innerHTML = newHeader.innerHTML;
+        }
+
+        const newMob = doc.querySelector('.pub-header-right-mobile');
+        const curMob = document.querySelector('.pub-header-right-mobile');
+        if (newMob && curMob) {
+          curMob.innerHTML = newMob.innerHTML;
+        }
+
+        const newFoot = doc.querySelector('.pub-footer');
+        const curFoot = document.querySelector('.pub-footer');
+        if (newFoot && curFoot) {
+          curFoot.innerHTML = newFoot.innerHTML;
+        }
+
+        // Re-vincular eventos de cerrar menú móvil
+        document.querySelectorAll('.pub-header-right-mobile .pub-nav-link').forEach(link => {
+          link.addEventListener('click', () => {
+            const toggle = document.getElementById('pub-menu-toggle');
+            if (toggle) toggle.checked = false;
+          });
+        });
+
         document.title = doc.title;
-        history.pushState({}, '', a.href);
+        if (doc.documentElement && doc.documentElement.lang) {
+          document.documentElement.lang = doc.documentElement.lang;
+        }
+
+        const targetUrl = res.url || a.href;
+        history.pushState({}, '', targetUrl);
         const root = document.querySelector('.pub-root');
         if (root) root.scrollTop = 0;
         else window.scrollTo(0, 0);

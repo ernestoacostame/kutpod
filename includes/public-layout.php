@@ -116,8 +116,8 @@ if ($masto_url) {
           <?php endif; ?>
           <?php $pub_lang = kp_detect_lang(); ?>
           <div class="row" style="gap:4px;align-items:center;margin-left:4px;font-size:11.5px;font-weight:700">
-            <a href="?lang=es" style="color:var(--pub-text);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $pub_lang === 'es' ? 'background:var(--accent);color:#fff;' : 'opacity:0.6;' ?>">ES</a>
-            <a href="?lang=en" style="color:var(--pub-text);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $pub_lang === 'en' ? 'background:var(--accent);color:#fff;' : 'opacity:0.6;' ?>">EN</a>
+            <a href="?lang=es" onclick="document.cookie='kp_lang=es;path=/;max-age=31536000;SameSite=Lax'" style="color:var(--pub-text);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $pub_lang === 'es' ? 'background:var(--accent);color:#fff;' : 'opacity:0.6;' ?>">ES</a>
+            <a href="?lang=en" onclick="document.cookie='kp_lang=en;path=/;max-age=31536000;SameSite=Lax'" style="color:var(--pub-text);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $pub_lang === 'en' ? 'background:var(--accent);color:#fff;' : 'opacity:0.6;' ?>">EN</a>
           </div>
         </div>
       </div>
@@ -143,8 +143,8 @@ if ($masto_url) {
         <a class="pub-btn pub-btn-ghost" href="/admin" title="<?= e(__('pub_admin_panel_title', 'Panel de Administración')) ?>"><?= __('pub_admin_panel', 'Admin') ?></a>
       <?php endif; ?>
       <div class="row" style="gap:4px;align-items:center;margin-left:4px;font-size:11.5px;font-weight:700">
-        <a href="?lang=es" style="color:var(--pub-text);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $pub_lang === 'es' ? 'background:var(--accent);color:#fff;' : 'opacity:0.6;' ?>">ES</a>
-        <a href="?lang=en" style="color:var(--pub-text);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $pub_lang === 'en' ? 'background:var(--accent);color:#fff;' : 'opacity:0.6;' ?>">EN</a>
+        <a href="?lang=es" onclick="document.cookie='kp_lang=es;path=/;max-age=31536000;SameSite=Lax'" style="color:var(--pub-text);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $pub_lang === 'es' ? 'background:var(--accent);color:#fff;' : 'opacity:0.6;' ?>">ES</a>
+        <a href="?lang=en" onclick="document.cookie='kp_lang=en;path=/;max-age=31536000;SameSite=Lax'" style="color:var(--pub-text);text-decoration:none;padding:2px 6px;border-radius:4px;<?= $pub_lang === 'en' ? 'background:var(--accent);color:#fff;' : 'opacity:0.6;' ?>">EN</a>
       </div>
     </div>
   </div>

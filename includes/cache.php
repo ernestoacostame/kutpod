@@ -91,3 +91,7 @@ function kp_cache_clear(): void {
         } catch (Throwable $e) {}
     }
 }
+
+function kp_cache_flush(): void {
+    kp_cache_clear();
+}

@@ -17,6 +17,18 @@ require_once __DIR__ . '/data.php';
 require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/includes/cache.php';
 
+// Cambio explícito de idioma
+if (isset($_GET['lang']) && in_array($_GET['lang'], ['es', 'en'], true)) {
+    kp_set_lang($_GET['lang']);
+    kp_cache_clear();
+    $redirectUrl = strtok($_SERVER['REQUEST_URI'], '?');
+    $params = $_GET;
+    unset($params['lang']);
+    $qs = http_build_query($params);
+    header('Location: ' . $redirectUrl . ($qs ? '?' . $qs : ''));
+    exit;
+}
+
 // Redirección para /@slug/feed (sin .xml) a /@slug/feed.xml
 if (preg_match('#^/@([a-z0-9\-]+)/feed/?$#i', parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), $m)) {
   $slug = strtolower($m[1]);

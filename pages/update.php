@@ -24,6 +24,14 @@ $history = [];
 try {
   $history = kp_q("SELECT * FROM updates ORDER BY id DESC LIMIT 20");
 } catch (Throwable $e) {}
+
+$kp_update_cache = kp_update_cached();
+$hasAvailableUpdate = false;
+if ($kp_update_cache && !empty($kp_update_cache['available']) && !empty($kp_update_cache['new_version'])) {
+  if (version_compare($kp_update_cache['new_version'], KUTPOD_VERSION, '>')) {
+    $hasAvailableUpdate = true;
+  }
+}
 ?>
 <div class="page-head">
   <div>
@@ -238,7 +246,38 @@ try {
 </div>
 
 <script>
-let _updateData = null;
+let _updateData = <?= $hasAvailableUpdate ? json_encode($kp_update_cache) : 'null' ?>;
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (_updateData && _updateData.available) {
+    const status = document.getElementById('update-status');
+    const available = document.getElementById('update-available');
+    const applyBtn = document.getElementById('btn-apply');
+    if (status) status.style.display = 'none';
+    if (available) available.style.display = 'block';
+    if (applyBtn) {
+      applyBtn.disabled = false;
+      applyBtn.innerHTML = '<?= icon('download',13) ?> ' + UPD_I18N.updateNow;
+    }
+    const verEl = document.getElementById('update-version-label');
+    if (verEl) verEl.textContent = _updateData.name || ('v' + _updateData.new_version);
+    const dateEl = document.getElementById('update-date-label');
+    if (dateEl) {
+      dateEl.textContent = _updateData.published_at
+        ? UPD_I18N.publishedOn + new Date(_updateData.published_at).toLocaleDateString(UPD_I18N.dateLocale, {year:'numeric', month:'long', day:'numeric'})
+        : '';
+    }
+    const chEl = document.getElementById('update-changelog-body');
+    if (chEl) chEl.textContent = _updateData.changelog || UPD_I18N.noReleaseNotes;
+    const ghLink = document.getElementById('update-gh-link');
+    if (ghLink) ghLink.href = _updateData.html_url || '#';
+  } else {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('check') === '1' || urlParams.get('auto') === '1') {
+      kpUpdateCheck();
+    }
+  }
+});
 
 const UPD_I18N = {
   searching: <?= json_encode(__('upd_btn_searching', 'Buscando...')) ?>,

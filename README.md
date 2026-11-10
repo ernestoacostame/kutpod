@@ -1,3 +1,6 @@
+<img width="2254" height="1372" alt="kutpod" src="https://github.com/user-attachments/assets/8898b1e0-7492-45a9-97c7-c4e2e49cb4a2" />
+<img width="2252" height="1366" alt="kutpod_front" src="https://github.com/user-attachments/assets/ab13c83f-5bf5-4de2-a7ea-abc69bba20cd" />
+
 # KutPod
 
 <p align="center">

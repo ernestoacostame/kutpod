@@ -17,7 +17,7 @@ $real_podcast_id = kp_one("SELECT id FROM podcasts WHERE slug = ?", [$p['id']])[
 
 $ep = null;
 if ($ep_id && $real_podcast_id) {
-    $ep = kp_one("SELECT * FROM episodes WHERE slug = ? AND podcast_id = ?", [$ep_id, $real_podcast_id]);
+    $ep = kp_one("SELECT * FROM episodes WHERE (slug = ? OR id = ?) AND podcast_id = ?", [$ep_id, $ep_id, $real_podcast_id]);
 }
 
 // Calculate default season and episode number

@@ -341,6 +341,25 @@ function kp_db(): PDO {
       $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '11') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
     } catch (Throwable $e) {}
   }
+
+  if ($current_version < 12) {
+    // Versión 12: Limpieza de likes erróneos/duplicados del Fediverso
+    try {
+      $pdo->exec("DELETE FROM ap_likes WHERE episode_id NOT IN (SELECT id FROM episodes)");
+      $pdo->exec("DELETE FROM ap_likes WHERE id IN (SELECT l.id FROM ap_likes l JOIN episodes e ON e.id = l.episode_id WHERE l.podcast_id != e.podcast_id)");
+      if (file_exists(__DIR__ . '/../activitypub.php')) {
+        require_once __DIR__ . '/../activitypub.php';
+        if (function_exists('kp_ap_cleanup_likes')) {
+          kp_ap_cleanup_likes();
+        }
+      }
+    } catch (Throwable $e) {}
+
+    // Guardar versión de esquema en settings
+    try {
+      $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '12') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
+    } catch (Throwable $e) {}
+  }
   
   return $pdo;
 }

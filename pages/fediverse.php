@@ -51,6 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     }
   }
+  if (isset($_POST['action']) && $_POST['action'] === 'clean_likes') {
+    require_once __DIR__ . '/../activitypub.php';
+    $cleaned = kp_ap_cleanup_likes();
+    kp_alert('system', 'Limpieza completada', "Se han limpiado $cleaned likes erróneos o duplicados del Fediverso.", '');
+    header('Location: /admin/fediverse?cleaned=' . (int)$cleaned);
+    exit;
+  }
 }
 
 $podcasts = kp_podcasts();
@@ -78,6 +85,11 @@ try {
     <?= icon('check', 16) ?> <?= __('fedi_defederate_success', 'El post de este episodio en el Fediverso se ha encolado para eliminación.') ?>
   </div>
 <?php endif; ?>
+<?php if (isset($_GET['cleaned'])): ?>
+  <div class="alert success" style="margin-bottom:var(--gap);display:flex;align-items:center;gap:8px;padding:12px;background:#10b98122;color:#10b981;border-radius:8px;border:1px solid #10b98144;font-size:14px">
+    <?= icon('check', 16) ?> <?= __('fedi_clean_likes_success', 'Se han depurado los likes del Fediverso (:count eliminados/corregidos).', ['count' => (int)$_GET['cleaned']]) ?>
+  </div>
+<?php endif; ?>
 
 <div class="page-head">
   <div>
@@ -85,6 +97,13 @@ try {
     <p class="page-sub"><?= __('fedi_sub', 'Federación ActivityPub · cada podcast es una cuenta citable desde Mastodon · cada episodio una nota') ?></p>
   </div>
   <div class="row" style="gap:8px">
+    <form method="POST" style="margin:0;padding:0;display:inline-block" onsubmit="return confirm('<?= e(__('fedi_confirm_clean_likes', '¿Deseas analizar y depurar likes duplicados o asignados erróneamente en los episodios?')) ?>')">
+      <?= kp_csrf_field() ?>
+      <input type="hidden" name="action" value="clean_likes">
+      <button type="submit" class="btn" style="display:inline-flex;align-items:center;gap:6px">
+        <?= icon('sparkles', 13) ?> <?= __('fedi_clean_likes_btn', 'Depurar likes') ?>
+      </button>
+    </form>
     <a class="btn btn-primary" href="<?= admin_url('preferences') ?>"><?= icon('settings',13) ?> <?= __('fedi_configure_instance', 'Configurar instancia') ?></a>
   </div>
 </div>

@@ -169,12 +169,13 @@ function api_require_user(): array {
         api_error(401, 'unauthorized', 'Token inválido o expirado');
     }
 
-    // Actualizar last_used (no crítico)
+    // Actualizar last_used y renovar expiración (sliding window para editor_api_tokens)
     try {
         $now = time();
         if (($user['token_type'] ?? '') === 'editor') {
-            $pdo->prepare("UPDATE editor_api_tokens SET last_used=:now WHERE token=:tok")
-                ->execute([':now' => $now, ':tok' => $token]);
+            $newExpiry = $now + 60 * 60 * 24 * 365;
+            $pdo->prepare("UPDATE editor_api_tokens SET last_used=:now, expires_at=:exp WHERE token=:tok")
+                ->execute([':now' => $now, ':exp' => $newExpiry, ':tok' => $token]);
         } else {
             $pdo->prepare("UPDATE api_tokens SET last_used_at=:now WHERE token_hash=:hash")
                 ->execute([':now' => $now, ':hash' => hash('sha256', $token)]);

@@ -67,7 +67,7 @@ if (!$used_token && password_needs_rehash($row['password_hash'], PASSWORD_BCRYPT
 
 $token     = api_random_token(32);
 $now       = time();
-$expiresAt = $now + 60 * 60 * 24 * 30;   // 30 días
+$expiresAt = $now + 60 * 60 * 24 * 365;   // 365 días (1 año)
 
 $ins = $pdo->prepare("
     INSERT INTO editor_api_tokens (token, user_id, client, created_at, last_used, expires_at)

@@ -752,17 +752,17 @@ $total_unread_all = $stats['all']['unread'] ?? 0;
               <div>
                 <?php if (!empty($a['link']) && $a['link'] !== '/admin/alerts'):
                   $lnk = $a['link'];
-                  if (preg_match('#/users/([^/]+)/notes/([^/?#]+)#', $lnk, $m)) {
-                    $cleanEp = preg_replace('/-\d+$/', '', $m[2]);
+                  if (preg_match('#/users/([^/]+)/notes/([^/?#]+)#i', $lnk, $m)) {
+                    $cleanEp = preg_replace('/-\d{9,11}$/', '', $m[2]);
                     $lnk = "/@" . $m[1] . "/" . $cleanEp;
-                  } elseif (preg_match('#/users/([^/?#]+)/?$#', $lnk, $m)) {
+                  } elseif (preg_match('#/users/([^/?#]+)/?$#i', $lnk, $m)) {
                     $lnk = "/@" . $m[1];
                   }
 
                   $linkLabel = __('alerts_view_detail', 'Ver detalle →');
                   $actionType = $a['action_type'] ?? '';
 
-                  if (str_contains($lnk, 'new-episode') || str_contains($lnk, '/notes/')) {
+                  if (str_contains($lnk, 'new-episode') || str_contains($lnk, '/notes/') || preg_match('#/@[^/]+/[^/?#]+#', $lnk)) {
                     $linkLabel = __('alerts_view_episode', 'Ver episodio →');
                   } elseif (str_contains($lnk, 'tab=analytics') || str_contains($lnk, '/admin/analytics')) {
                     $linkLabel = __('alerts_view_stats', 'Ver estadísticas →');

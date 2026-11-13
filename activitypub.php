@@ -210,6 +210,127 @@ function kp_ap_followers(string $slug): void {
 }
 
 // ---------------------------------------------------------------------------
+// Resolver episodio a partir de un targetLink (URL de nota, actividad, permalink, outbox, etc.)
+// ---------------------------------------------------------------------------
+function kp_ap_resolve_episode($podcast, ?string $targetLink): ?array {
+  if (empty($targetLink)) return null;
+
+  $podcastId = is_array($podcast) ? (int)($podcast['id'] ?? 0) : (is_numeric($podcast) ? (int)$podcast : 0);
+  $podcastSlug = is_array($podcast) ? strtolower(trim($podcast['slug'] ?? '')) : (is_string($podcast) && !is_numeric($podcast) ? strtolower(trim($podcast)) : '');
+
+  if (!$podcastId && $podcastSlug) {
+    $pRow = kp_one("SELECT id, slug FROM podcasts WHERE LOWER(slug) = LOWER(?)", [$podcastSlug]);
+    if ($pRow) {
+      $podcastId = (int)$pRow['id'];
+      $podcastSlug = strtolower(trim($pRow['slug']));
+    }
+  } elseif ($podcastId && !$podcastSlug) {
+    $pRow = kp_one("SELECT id, slug FROM podcasts WHERE id = ?", [$podcastId]);
+    if ($pRow) {
+      $podcastSlug = strtolower(trim($pRow['slug'] ?? ''));
+    }
+  }
+
+  if (!$podcastId) return null;
+
+  $targetLink = trim($targetLink);
+  $origTargetLink = $targetLink;
+
+  // 1. Extraer posibles candidatos de slug desde la URL
+  $candidateSlugs = [];
+
+  // Patrón 1: /users/{pod}/notes/{slug} o /users/{pod}/activities/{slug}
+  if (preg_match('#/users/[^/]+/(?:notes|activities)/([^/?#]+)#i', $targetLink, $m)) {
+    $candidateSlugs[] = $m[1];
+  }
+  // Patrón 2: /notes/{slug} o /activities/{slug} (sin /users/)
+  if (preg_match('#/(?:notes|activities)/([^/?#]+)#i', $targetLink, $m)) {
+    $candidateSlugs[] = $m[1];
+  }
+  // Patrón 3: /@{pod}/{slug} o /embed/@{pod}/{slug}
+  if (preg_match('#/(?:embed/)?@[^/]+/([^/?#]+)#i', $targetLink, $m)) {
+    $candidateSlugs[] = $m[1];
+  }
+  // Patrón 4: Parámetros de consulta ?slug={slug} o ?ep={slug} o ?id={id}
+  $parsedUrl = parse_url($targetLink);
+  if (!empty($parsedUrl['query'])) {
+    parse_str($parsedUrl['query'], $qp);
+    if (!empty($qp['slug'])) $candidateSlugs[] = $qp['slug'];
+    if (!empty($qp['ep'])) $candidateSlugs[] = $qp['ep'];
+    if (!empty($qp['id'])) $candidateSlugs[] = $qp['id'];
+  }
+  // Patrón 5: Último segmento de ruta si la URL apunta a un path relativo o absoluto
+  if (!empty($parsedUrl['path'])) {
+    $pathSegments = array_values(array_filter(explode('/', trim($parsedUrl['path'], '/'))));
+    if (!empty($pathSegments)) {
+      $lastSeg = end($pathSegments);
+      if ($lastSeg !== $podcastSlug && $lastSeg !== 'notes' && $lastSeg !== 'activities') {
+        $candidateSlugs[] = $lastSeg;
+      }
+    }
+  }
+
+  // 2. Probar candidatos contra la tabla episodes
+  foreach ($candidateSlugs as $raw) {
+    if (!$raw) continue;
+    $variants = [
+      $raw,
+      urldecode($raw),
+      preg_replace('/-\d{9,11}$/', '', $raw),
+      preg_replace('/-\d+$/', '', $raw),
+    ];
+    $variants = array_unique(array_filter($variants));
+    foreach ($variants as $cand) {
+      if ($cand === $podcastSlug) continue; // Ignorar perfil del podcast
+      $ep = kp_one("SELECT * FROM episodes WHERE podcast_id = ? AND (LOWER(slug) = LOWER(?) OR id = ? OR guid = ?) LIMIT 1",
+        [$podcastId, $cand, is_numeric($cand) ? (int)$cand : -1, $cand]);
+      if ($ep) return $ep;
+    }
+  }
+
+  // 3. Si no se resolvió por URL directa, buscar en ap_outbox si coincide con alguna actividad o nota publicada
+  $outboxRows = kp_q("
+    SELECT object_json FROM ap_outbox 
+    WHERE podcast_id = ? AND (activity_id = ? OR activity_id = ? OR object_json LIKE ? OR object_json LIKE ?) 
+    ORDER BY id DESC LIMIT 5
+  ", [$podcastId, $origTargetLink, urldecode($origTargetLink), '%' . $origTargetLink . '%', '%' . urldecode($origTargetLink) . '%']) ?: [];
+
+  foreach ($outboxRows as $outboxRow) {
+    if (empty($outboxRow['object_json'])) continue;
+    $outJson = json_decode($outboxRow['object_json'], true);
+    if (!is_array($outJson)) continue;
+
+    $candidatesFromOutbox = [];
+    if (!empty($outJson['object']['url'])) $candidatesFromOutbox[] = $outJson['object']['url'];
+    if (!empty($outJson['url'])) $candidatesFromOutbox[] = $outJson['url'];
+    if (!empty($outJson['object']['id'])) $candidatesFromOutbox[] = $outJson['object']['id'];
+    if (!empty($outJson['id'])) $candidatesFromOutbox[] = $outJson['id'];
+
+    foreach ($candidatesFromOutbox as $outUrl) {
+      if (preg_match('#/(?:embed/)?@[^/]+/([^/?#]+)#i', $outUrl, $nm) ||
+          preg_match('#/(?:notes|activities)/([^/?#]+)#i', $outUrl, $nm)) {
+        $cand = $nm[1];
+        $candVariants = [
+          $cand,
+          urldecode($cand),
+          preg_replace('/-\d{9,11}$/', '', $cand),
+          preg_replace('/-\d+$/', '', $cand),
+        ];
+        $candVariants = array_unique(array_filter($candVariants));
+        foreach ($candVariants as $cv) {
+          if ($cv === $podcastSlug) continue;
+          $ep = kp_one("SELECT * FROM episodes WHERE podcast_id = ? AND (LOWER(slug) = LOWER(?) OR id = ? OR guid = ?) LIMIT 1",
+            [$podcastId, $cv, is_numeric($cv) ? (int)$cv : -1, $cv]);
+          if ($ep) return $ep;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Inbox · recibe Follow/Undo/Like/Announce de otras instancias
 // ---------------------------------------------------------------------------
 function kp_ap_inbox(string $slug): void {
@@ -270,33 +391,9 @@ function kp_ap_inbox(string $slug): void {
       } elseif ($undoType === 'Like') {
         $likedObj = is_array($undoObj) ? ($undoObj['object'] ?? '') : '';
         $targetLink = is_string($likedObj) ? $likedObj : ($likedObj['id'] ?? $likedObj['url'] ?? '');
-        $episodeId = null;
-        if ($targetLink) {
-          if (preg_match('#/users/([^/]+)/(?:notes|activities)/([^/?#]+)#', $targetLink, $m)) {
-            $cleanEp = preg_replace('/-\d+$/', '', $m[2]);
-            $epRow = kp_one("SELECT id FROM episodes WHERE podcast_id = ? AND slug = ?", [$p['id'], $cleanEp]);
-            if ($epRow) $episodeId = (int)$epRow['id'];
-          } elseif (preg_match('#/@([^/]+)/([^/?#]+)#', $targetLink, $m)) {
-            $epRow = kp_one("SELECT id FROM episodes WHERE podcast_id = ? AND slug = ?", [$p['id'], $m[2]]);
-            if ($epRow) $episodeId = (int)$epRow['id'];
-          }
-        }
-        if (!$episodeId && $targetLink) {
-          $outboxRow = kp_one("SELECT object_json FROM ap_outbox WHERE podcast_id = ? AND (activity_id = ? OR object_json LIKE ?) ORDER BY id DESC LIMIT 1",
-            [$p['id'], $targetLink, '%' . $targetLink . '%']);
-          if ($outboxRow) {
-            $outJson = json_decode($outboxRow['object_json'] ?? '', true);
-            $noteUrl = $outJson['object']['url'] ?? $outJson['url'] ?? '';
-            if ($noteUrl && preg_match('#/@([^/]+)/([^/?#]+)#', $noteUrl, $nm)) {
-              $epRow = kp_one("SELECT id FROM episodes WHERE podcast_id = ? AND slug = ?", [$p['id'], $nm[2]]);
-              if ($epRow) {
-                $episodeId = (int)$epRow['id'];
-              }
-            }
-          }
-        }
-        if ($episodeId) {
-          kp_db()->prepare("DELETE FROM ap_likes WHERE episode_id = ? AND actor_url = ?")->execute([$episodeId, $actor]);
+        $ep = kp_ap_resolve_episode($p, $targetLink);
+        if ($ep) {
+          kp_db()->prepare("DELETE FROM ap_likes WHERE episode_id = ? AND actor_url = ?")->execute([$ep['id'], $actor]);
         }
         if (file_exists(__DIR__ . '/includes/cache.php')) {
           require_once __DIR__ . '/includes/cache.php';
@@ -318,37 +415,14 @@ function kp_ap_inbox(string $slug): void {
       
       $rawObj = $a['object'] ?? '';
       $targetLink = is_string($rawObj) ? $rawObj : ($rawObj['id'] ?? $rawObj['url'] ?? '');
-      $episodeId = null;
-      if ($targetLink && preg_match('#/users/([^/]+)/(?:notes|activities)/([^/?#]+)#', $targetLink, $m)) {
-        $cleanEp = preg_replace('/-\d+$/', '', $m[2]);
-        $targetLink = kp_ap_base() . "/@" . $m[1] . "/" . $cleanEp;
-        $epRow = kp_one("SELECT id FROM episodes WHERE podcast_id = ? AND slug = ?", [$p['id'], $cleanEp]);
-        if ($epRow) $episodeId = (int)$epRow['id'];
-      } elseif ($targetLink && preg_match('#/@([^/]+)/([^/?#]+)#', $targetLink, $m)) {
-        $epRow = kp_one("SELECT id FROM episodes WHERE podcast_id = ? AND slug = ?", [$p['id'], $m[2]]);
-        if ($epRow) $episodeId = (int)$epRow['id'];
-      }
+      $ep = kp_ap_resolve_episode($p, $targetLink);
+      $episodeId = $ep ? (int)$ep['id'] : null;
 
-      // Si no se resolvió por URL directa, buscar en el outbox si el objeto coincide con una actividad o nota publicada
-      if (!$episodeId && $targetLink) {
-        $outboxRow = kp_one("SELECT object_json FROM ap_outbox WHERE podcast_id = ? AND (activity_id = ? OR object_json LIKE ?) ORDER BY id DESC LIMIT 1",
-          [$p['id'], $targetLink, '%' . $targetLink . '%']);
-        if ($outboxRow) {
-          $outJson = json_decode($outboxRow['object_json'] ?? '', true);
-          $noteUrl = $outJson['object']['url'] ?? $outJson['url'] ?? '';
-          if ($noteUrl && preg_match('#/@([^/]+)/([^/?#]+)#', $noteUrl, $nm)) {
-            $epRow = kp_one("SELECT id FROM episodes WHERE podcast_id = ? AND slug = ?", [$p['id'], $nm[2]]);
-            if ($epRow) {
-              $episodeId = (int)$epRow['id'];
-              $targetLink = $noteUrl;
-            }
-          }
-        }
-      }
-
-      // Si no pertenece a ningún episodio en particular (ej. interacciones con el perfil del podcast):
-      // NO asociar a un episodio arbitrariamente. Mantener episodeId como null.
-      if (!$episodeId) {
+      if ($ep) {
+        $targetLink = kp_ap_base() . "/@" . $p['slug'] . "/" . $ep['slug'];
+      } else {
+        // Si no pertenece a ningún episodio en particular (interacción con el perfil del podcast):
+        // NO asociar a un episodio arbitrariamente. Mantener episodeId como null.
         $targetLink = $targetLink ?: (kp_ap_base() . "/@" . $p['slug']);
       }
 
@@ -862,10 +936,20 @@ function kp_ap_dm_admin(array $p, string $commentUrl, string $authorHandle): voi
 // Note · Permite a Mastodon consultar la nota original por ID
 // ---------------------------------------------------------------------------
 function kp_ap_note(string $slug, string $epSlug): void {
-  $originalEpSlug = preg_replace('/-\d+$/', '', $epSlug);
   $p = kp_one("SELECT * FROM podcasts WHERE slug = ?", [$slug]);
-  $e = kp_one("SELECT * FROM episodes WHERE podcast_id = ? AND slug = ?", [$p['id'] ?? 0, $originalEpSlug]);
-  if (!$p || !$e) { http_response_code(404); exit; }
+  if (!$p) { http_response_code(404); exit; }
+
+  // Probar coincidencia exacta primero, luego quitando sufijo timestamp UNIX si fue re-publicado
+  $e = kp_one("SELECT * FROM episodes WHERE podcast_id = ? AND (LOWER(slug) = LOWER(?) OR id = ?)", [$p['id'] ?? 0, $epSlug, is_numeric($epSlug) ? (int)$epSlug : -1]);
+  if (!$e) {
+    $cleanSlug = preg_replace('/-\d{9,11}$/', '', $epSlug);
+    $e = kp_one("SELECT * FROM episodes WHERE podcast_id = ? AND (LOWER(slug) = LOWER(?) OR id = ?)", [$p['id'] ?? 0, $cleanSlug, is_numeric($cleanSlug) ? (int)$cleanSlug : -1]);
+  }
+  if (!$e) {
+    $cleanSlug = preg_replace('/-\d+$/', '', $epSlug);
+    $e = kp_one("SELECT * FROM episodes WHERE podcast_id = ? AND (LOWER(slug) = LOWER(?) OR id = ?)", [$p['id'] ?? 0, $cleanSlug, is_numeric($cleanSlug) ? (int)$cleanSlug : -1]);
+  }
+  if (!$e) { http_response_code(404); exit; }
   
   $base = kp_ap_base();
   $actor = "$base/users/{$p['slug']}";
@@ -900,6 +984,67 @@ function kp_ap_note(string $slug, string $epSlug): void {
 }
 
 // ---------------------------------------------------------------------------
+// Sincronizar likes históricos o pendientes desde alerts hacia ap_likes
+// ---------------------------------------------------------------------------
+function kp_ap_sync_likes_from_alerts(?int $podcastId = null, ?int $episodeId = null): int {
+  $synced = 0;
+  try {
+    $alerts = kp_q("
+      SELECT * FROM alerts 
+      WHERE (action_type = 'Like' OR action_type = 'like' OR title LIKE '%Me Gusta%' OR title LIKE '%like%')
+        AND actor_url IS NOT NULL AND actor_url != ''
+      ORDER BY id ASC
+    ") ?: [];
+
+    if (empty($alerts)) return 0;
+
+    $insLike = kp_db()->prepare("
+      INSERT OR IGNORE INTO ap_likes (podcast_id, episode_id, actor_url, actor_name, actor_handle, actor_avatar, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    ");
+
+    $allPodcasts = kp_q("SELECT id, slug, title FROM podcasts") ?: [];
+    $podMap = [];
+    foreach ($allPodcasts as $pod) {
+      $podMap[(int)$pod['id']] = $pod;
+    }
+
+    foreach ($alerts as $al) {
+      $actorUrl = trim($al['actor_url'] ?? '');
+      if (!$actorUrl) continue;
+      $lnk = trim($al['link'] ?? '');
+      if (!$lnk) continue;
+
+      $targetPodcasts = ($podcastId && isset($podMap[$podcastId])) ? [$podMap[$podcastId]] : $allPodcasts;
+      foreach ($targetPodcasts as $pod) {
+        $ep = kp_ap_resolve_episode($pod, $lnk);
+        if ($ep) {
+          $epId = (int)$ep['id'];
+          if ($episodeId && $epId !== $episodeId) {
+            continue;
+          }
+          $exists = kp_one("SELECT id FROM ap_likes WHERE episode_id = ? AND actor_url = ?", [$epId, $actorUrl]);
+          if (!$exists) {
+            $handle = preg_match('#@([^@/]+)$#', $actorUrl, $hm) ? $hm[1] : (parse_url($actorUrl, PHP_URL_PATH) ? basename(parse_url($actorUrl, PHP_URL_PATH)) : 'user');
+            $name = !empty($al['actor_name']) ? $al['actor_name'] : $handle;
+            $avatar = !empty($al['actor_avatar']) ? $al['actor_avatar'] : '';
+            $createdAt = !empty($al['created_at']) ? $al['created_at'] : gmdate('Y-m-d H:i:s');
+
+            $insLike->execute([(int)$pod['id'], $epId, $actorUrl, $name, $handle, $avatar, $createdAt]);
+            $synced++;
+          }
+          break;
+        }
+      }
+    }
+  } catch (Throwable $e) {
+    kp_ap_log("Error en kp_ap_sync_likes_from_alerts: " . $e->getMessage());
+  }
+
+  return $synced;
+}
+
+// ---------------------------------------------------------------------------
 // Obtener likes del Fediverso para un episodio
 // ---------------------------------------------------------------------------
 function kp_ap_get_episode_likes($episodeId): array {
@@ -920,6 +1065,13 @@ function kp_ap_get_episode_likes($episodeId): array {
     return [];
   }
   $numericEpId = (int)$ep['id'];
+  $podcastId = (int)$ep['podcast_id'];
+
+  // Si no hay likes en ap_likes para este episodio, intentar sincronizar de alerts
+  $existingCount = (int)(kp_one("SELECT count(*) as c FROM ap_likes WHERE episode_id = ?", [$numericEpId])['c'] ?? 0);
+  if ($existingCount === 0) {
+    kp_ap_sync_likes_from_alerts($podcastId, $numericEpId);
+  }
 
   $rows = kp_q("SELECT * FROM ap_likes WHERE episode_id = ? ORDER BY id DESC", [$numericEpId]) ?: [];
 
@@ -978,9 +1130,6 @@ function kp_ap_cleanup_likes(): int {
     if (!empty($likes)) {
       foreach ($likes as $like) {
         $actorUrl = $like['actor_url'];
-        $epSlug = strtolower(trim($like['ep_slug']));
-        $podSlug = strtolower(trim($like['pod_slug']));
-
         $alerts = kp_q("
           SELECT link 
           FROM alerts 
@@ -993,29 +1142,21 @@ function kp_ap_cleanup_likes(): int {
           $isPodcastProfileLike = false;
 
           foreach ($alerts as $al) {
-            $lnk = strtolower(urldecode($al['link'] ?? ''));
+            $lnk = $al['link'] ?? '';
             if (!$lnk) continue;
 
-            $isThisEp = false;
-            if (preg_match('#/(?:notes|activities|@[^/]+)/' . preg_quote($epSlug, '#') . '(?:-\d+)?(?:/|$|\?|#)#', $lnk)) {
-              $isThisEp = true;
-            } elseif ($epSlug !== '' && str_ends_with(rtrim($lnk, '/'), '/' . $epSlug)) {
-              $isThisEp = true;
-            }
-
-            if ($isThisEp) {
-              $hasMatchForThisEp = true;
-            } else {
-              if (preg_match('#/(?:notes|activities|@[^/]+)/([^/?#]+)#', $lnk, $m)) {
-                $cleanSlug = preg_replace('/-\d+$/', '', $m[1]);
-                if ($cleanSlug !== '' && $cleanSlug !== $podSlug && $cleanSlug !== $epSlug) {
-                  $hasMatchForOtherEp = true;
-                }
+            $resolved = kp_ap_resolve_episode((int)$like['podcast_id'], $lnk);
+            if ($resolved) {
+              if ((int)$resolved['id'] === (int)$like['episode_id']) {
+                $hasMatchForThisEp = true;
+              } else {
+                $hasMatchForOtherEp = true;
               }
-              if (preg_match('#/(?:users/)?(?:@[^/]+|[^/]+)/?$#', $lnk) && !preg_match('#/(?:notes|activities)/#', $lnk)) {
-                if (str_contains($lnk, '@' . $podSlug) || str_contains($lnk, '/users/' . $podSlug)) {
-                  $isPodcastProfileLike = true;
-                }
+            } else {
+              $podSlug = strtolower(trim($like['pod_slug']));
+              $lnkLow = strtolower(urldecode($lnk));
+              if (str_contains($lnkLow, '@' . $podSlug) || str_contains($lnkLow, '/users/' . $podSlug)) {
+                $isPodcastProfileLike = true;
               }
             }
           }
@@ -1026,19 +1167,11 @@ function kp_ap_cleanup_likes(): int {
             continue;
           }
         }
-
-        // Si el actor fue duplicado en múltiples episodios sin una alerta específica para cada uno,
-        // conservar solo el primer registro y eliminar los duplicados.
-        $dups = kp_q("SELECT id FROM ap_likes WHERE actor_url = ? AND podcast_id = ? ORDER BY id ASC", [$actorUrl, $like['podcast_id']]);
-        if (count($dups) > 1) {
-          $firstId = (int)$dups[0]['id'];
-          if ((int)$like['id'] !== $firstId) {
-            $pdo->prepare("DELETE FROM ap_likes WHERE id = ?")->execute([$like['id']]);
-            $cleaned++;
-          }
-        }
       }
     }
+
+    // 4. Sincronizar likes legítimos que existan en alerts
+    kp_ap_sync_likes_from_alerts();
 
     if ($cleaned > 0 && file_exists(__DIR__ . '/includes/cache.php')) {
       require_once __DIR__ . '/includes/cache.php';
@@ -1077,7 +1210,7 @@ if ((isset($_SERVER['SCRIPT_FILENAME']) && realpath(__FILE__) === realpath($_SER
       exit;
     }
     if ($ap === 'note') {
-      $cleanEp = preg_replace('/-\d+$/', '', $_GET['ep'] ?? '');
+      $cleanEp = preg_replace('/-\d{9,11}$/', '', $_GET['ep'] ?? '');
       header('Location: ' . kp_ap_base() . '/@' . $slug . '/' . $cleanEp, true, 302);
       exit;
     }

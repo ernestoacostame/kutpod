@@ -360,6 +360,23 @@ function kp_db(): PDO {
       $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '12') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
     } catch (Throwable $e) {}
   }
+
+  if ($current_version < 13) {
+    // Versión 13: Re-sincronización y resolución robusta de likes de ActivityPub
+    try {
+      if (file_exists(__DIR__ . '/../activitypub.php')) {
+        require_once __DIR__ . '/../activitypub.php';
+        if (function_exists('kp_ap_sync_likes_from_alerts')) {
+          kp_ap_sync_likes_from_alerts();
+        }
+      }
+    } catch (Throwable $e) {}
+
+    // Guardar versión de esquema en settings
+    try {
+      $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '13') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
+    } catch (Throwable $e) {}
+  }
   
   return $pdo;
 }

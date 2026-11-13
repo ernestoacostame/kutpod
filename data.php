@@ -135,6 +135,35 @@ function kp_episodes(bool $all = false, ?string $podcastSlug = null, ?int $limit
       $limit_sql
     ", $params_q);
     foreach ($rows as &$r) {
+      if ((int)($r['duration_secs'] ?? 0) <= 0) {
+        $foundPath = '';
+        if (!empty($r['audio_url']) && strpos($r['audio_url'], '/media/') === 0) {
+          $candidate = __DIR__ . $r['audio_url'];
+          if (file_exists($candidate)) $foundPath = $candidate;
+        }
+        if (!$foundPath && !empty($r['podcast']) && !empty($r['id'])) {
+          $dir = __DIR__ . '/media/audio/' . $r['podcast'];
+          if (is_dir($dir)) {
+            foreach (['mp3', 'm4a', 'ogg', 'wav', 'flac', 'aac'] as $ext) {
+              $candidate = $dir . '/' . $r['id'] . '.' . $ext;
+              if (file_exists($candidate)) {
+                $foundPath = $candidate;
+                break;
+              }
+            }
+          }
+        }
+        if ($foundPath) {
+          require_once __DIR__ . '/includes/ffmpeg.php';
+          $detected = kp_extract_audio_duration($foundPath);
+          if ($detected > 0) {
+            $r['duration_secs'] = $detected;
+            try {
+              kp_db()->prepare("UPDATE episodes SET duration_secs = ? WHERE id = ?")->execute([$detected, $r['db_id']]);
+            } catch (Throwable $e) {}
+          }
+        }
+      }
       $r['duration'] = kp_fmt_duration((int)($r['duration_secs'] ?? 0));
       $r['date']     = kp_fmt_relative_date($r['date_iso'] ?? '');
     }

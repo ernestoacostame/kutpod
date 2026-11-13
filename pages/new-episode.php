@@ -155,6 +155,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               }
               }
           }
+
+          if ($duration_secs <= 0) {
+              $duration_secs = kp_extract_audio_duration($dest);
+          }
       }
   }
 

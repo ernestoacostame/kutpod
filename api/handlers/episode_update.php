@@ -47,8 +47,14 @@ foreach ([$audioDir, $coverDir, $chapDir, $transDir] as $d) {
 }
 
 $audioPublicUrl = $episode['audio_url'];
+require_once __DIR__ . '/../../includes/ffmpeg.php';
+
 $bytes = $episode['audio_bytes'];
 $duration_secs = (int)($episode['duration_secs'] ?? 0);
+$clientDur = (int)($_POST['duration_secs'] ?? $_POST['duration'] ?? $_POST['client_duration'] ?? 0);
+if ($clientDur > 0) {
+    $duration_secs = $clientDur;
+}
 
 // ── 4) Mover audio (Opcional en actualización) ──────────────────────
 if (!empty($_FILES['audio']) && ($_FILES['audio']['error'] ?? 99) === UPLOAD_ERR_OK) {
@@ -63,12 +69,10 @@ if (!empty($_FILES['audio']) && ($_FILES['audio']['error'] ?? 99) === UPLOAD_ERR
         $audioPublicUrl = "/" . $audioRel;
         $bytes = filesize($audioAbs) ?: 0;
 
-        $probeJson = @shell_exec('ffprobe -v quiet -print_format json -show_format ' . escapeshellarg($audioAbs));
-        if ($probeJson) {
-            $probe = json_decode($probeJson, true);
-            if (!empty($probe['format']['duration'])) {
-                $duration_secs = (int)round((float)$probe['format']['duration']);
-            }
+        if ($clientDur > 0) {
+            $duration_secs = $clientDur;
+        } else {
+            $duration_secs = kp_extract_audio_duration($audioAbs);
         }
     }
 }

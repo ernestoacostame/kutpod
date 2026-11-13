@@ -103,13 +103,11 @@ if (!move_uploaded_file($_FILES['audio']['tmp_name'], $audioAbs)) {
     api_error(500, 'upload_failed', 'No se pudo mover el archivo de audio');
 }
 
-$duration_secs = 0;
-$probeJson = @shell_exec('ffprobe -v quiet -print_format json -show_format ' . escapeshellarg($audioAbs));
-if ($probeJson) {
-    $probe = json_decode($probeJson, true);
-    if (!empty($probe['format']['duration'])) {
-        $duration_secs = (int)round((float)$probe['format']['duration']);
-    }
+require_once __DIR__ . '/../../includes/ffmpeg.php';
+
+$duration_secs = (int)($_POST['duration_secs'] ?? $_POST['duration'] ?? $_POST['client_duration'] ?? 0);
+if ($duration_secs <= 0) {
+    $duration_secs = kp_extract_audio_duration($audioAbs);
 }
 
 // audio_url se publica vía /r/ (OP3 tracker nativo)

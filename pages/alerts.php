@@ -682,7 +682,10 @@ $total_unread_all = $stats['all']['unread'] ?? 0;
           
           <!-- Avatar o icono representativo -->
           <?php if (!empty($a['actor_avatar'])): ?>
-            <div style="width:40px;height:40px;border-radius:10px;background:var(--bg-3) url('<?= e($a['actor_avatar']) ?>') center/cover;flex-shrink:0;box-shadow:0 0 0 1px var(--border);"></div>
+            <img src="<?= e($a['actor_avatar']) ?>" alt="<?= e($a['actor_name'] ?: '') ?>" style="width:40px;height:40px;border-radius:10px;object-fit:cover;flex-shrink:0;box-shadow:0 0 0 1px var(--border);" loading="lazy" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.style.display='inline-flex';">
+            <div class="alert-card-avatar" style="display:none;">
+              <?= icon($catMeta['icon'], 18) ?>
+            </div>
           <?php else: ?>
             <div class="alert-card-avatar">
               <?= icon($catMeta['icon'], 18) ?>

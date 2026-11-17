@@ -13,8 +13,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         kp_db()->prepare("DELETE FROM ap_delivery WHERE id = ?")->execute([$id]);
     } elseif ($id && $action === 'retry') {
         kp_db()->prepare("UPDATE ap_delivery SET status='pending', attempts=0, next_try=datetime('now') WHERE id = ?")->execute([$id]);
+        require_once __DIR__ . '/../activitypub.php';
+        kp_ap_trigger_delivery();
     } elseif ($id && $action === 'stop') {
         kp_db()->prepare("UPDATE ap_delivery SET status='failed' WHERE id = ?")->execute([$id]);
+    } elseif ($id && $action === 'remove_follower') {
+        require_once __DIR__ . '/../activitypub.php';
+        $row = kp_one("SELECT inbox FROM ap_delivery WHERE id = ?", [$id]);
+        if ($row && !empty($row['inbox'])) {
+            kp_ap_remove_follower_by_inbox($row['inbox'], "Eliminado manualmente desde la cola");
+        }
+        kp_db()->prepare("DELETE FROM ap_delivery WHERE id = ?")->execute([$id]);
+        header('Location: /admin/queue?deleted_follower=1');
+        exit;
+    } elseif ($action === 'purge_failed') {
+        require_once __DIR__ . '/../activitypub.php';
+        $failed = kp_q("SELECT DISTINCT inbox FROM ap_delivery WHERE status = 'failed' OR attempts >= 3");
+        $purgedCount = 0;
+        foreach ($failed as $f) {
+            if (!empty($f['inbox'])) {
+                kp_ap_remove_follower_by_inbox($f['inbox'], "Purga masiva de seguidores con errores");
+                $purgedCount++;
+            }
+        }
+        header('Location: /admin/queue?purged=' . $purgedCount);
+        exit;
     } elseif ($action === 'process_queue') {
         require_once __DIR__ . '/../activitypub.php';
         $sent = kp_ap_deliver_pending(100);
@@ -51,6 +74,12 @@ $status_colors = [
     <p class="page-sub"><?= __('queue_sub', 'Gestión de envíos al Fediverso y otras tareas en segundo plano.') ?></p>
   </div>
   <div class="row" style="gap:8px">
+    <form method="POST" style="margin: 0;" onsubmit="return confirm('<?= e(__('queue_confirm_purge_failed', '¿Deseas eliminar permanentemente de los seguidores todas las direcciones con errores o intentos fallidos?')) ?>');">
+      <?= kp_csrf_field() ?>
+      <button type="submit" name="_action" value="purge_failed" class="btn" style="display: flex; align-items: center; gap: 6px; color: #ef4444;">
+        <?= icon('userMinus', 14) ?> <?= __('queue_purge_failed_btn', 'Limpiar seguidores con error') ?>
+      </button>
+    </form>
     <form method="POST" style="margin: 0;">
       <?= kp_csrf_field() ?>
       <button type="submit" name="_action" value="process_queue" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px;">
@@ -59,6 +88,18 @@ $status_colors = [
     </form>
   </div>
 </div>
+
+<?php if (isset($_GET['purged'])): ?>
+  <div class="card card-lg" style="margin-bottom: 20px; border-left: 4px solid #10b981; padding: 16px;">
+    <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; color: #10b981;">
+      <?= icon('check', 16) ?>
+      <?= __('queue_proc_done', 'Proceso completado') ?>
+    </div>
+    <p style="margin: 8px 0 0; font-size: 14px; color: var(--text-2);">
+      <?= __raw('queue_purged_count', 'Se han eliminado <strong>:count</strong> seguidores inaccesibles o con errores.', ['count' => (int)$_GET['purged']]) ?>
+    </p>
+  </div>
+<?php endif; ?>
 
 <?php if (isset($_GET['sent'])): ?>
   <div class="card card-lg" style="margin-bottom: 20px; border-left: 4px solid var(--primary); padding: 16px;">
@@ -129,6 +170,7 @@ $status_colors = [
                    <?php elseif ($q['status'] === 'pending'): ?>
                       <button class="btn btn-ghost" type="submit" name="_action" value="stop" title="<?= __('queue_stop', 'Detener') ?>"><?= icon('x', 14) ?></button>
                    <?php endif; ?>
+                   <button class="btn btn-ghost" type="submit" name="_action" value="remove_follower" title="<?= e(__('queue_remove_follower', 'Eliminar seguidor e inbox')) ?>" style="color: #f97316;" onclick="return confirm('<?= e(__('queue_confirm_remove_follower', '¿Deseas eliminar permanentemente a este seguidor de la lista de entrega?')) ?>');"><?= icon('userMinus', 14) ?></button>
                    <button class="btn btn-ghost" type="submit" name="_action" value="delete" title="<?= __('delete', 'Eliminar') ?>" style="color: #ef4444;" onclick="return confirm('<?= e(__('queue_confirm_delete', '¿Seguro que deseas eliminar este proceso?')) ?>');"><?= icon('trash', 14) ?></button>
                 </form>
             </td>

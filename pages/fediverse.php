@@ -11,8 +11,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $d = trim($_POST['domain'] ?? '');
     if ($d) {
       kp_q("INSERT OR REPLACE INTO fediverse_blocks (domain, reason, kind) VALUES (?, '', 'manual')", [$d]);
+      // Eliminar seguidores de este dominio y cancelar entregas pendientes
+      kp_q("DELETE FROM ap_followers WHERE LOWER(inbox) LIKE ? OR LOWER(actor_url) LIKE ?", ["%://$d/%", "%://$d/%"]);
+      kp_q("UPDATE ap_delivery SET status='failed', last_error='Dominio bloqueado' WHERE status='pending' AND LOWER(inbox) LIKE ?", ["%://$d/%"]);
     }
     header('Location: /admin/fediverse');
+    exit;
+  }
+  if (isset($_POST['action']) && $_POST['action'] === 'delete_follower') {
+    $fid = (int)($_POST['follower_id'] ?? 0);
+    if ($fid > 0) {
+      $f = kp_one("SELECT inbox, actor_url FROM ap_followers WHERE id = ?", [$fid]);
+      if ($f) {
+        if (!empty($f['inbox'])) {
+          require_once __DIR__ . '/../activitypub.php';
+          kp_ap_remove_follower_by_inbox($f['inbox'], "Eliminado manualmente desde panel fediverso");
+        } else {
+          kp_q("DELETE FROM ap_followers WHERE id = ?", [$fid]);
+        }
+      }
+    }
+    header('Location: /admin/fediverse');
+    exit;
+  }
+  if (isset($_POST['action']) && $_POST['action'] === 'clean_dead_followers') {
+    require_once __DIR__ . '/../activitypub.php';
+    $deadInboxes = kp_q("SELECT DISTINCT inbox FROM ap_delivery WHERE status = 'failed' OR attempts >= 3");
+    $purged = 0;
+    foreach ($deadInboxes as $row) {
+      if (!empty($row['inbox'])) {
+        kp_ap_remove_follower_by_inbox($row['inbox'], "Limpieza manual de seguidores con errores");
+        $purged++;
+      }
+    }
+    kp_alert('system', 'Limpieza completada', "Se han purgado $purged seguidores con errores o inaccesibles.", '');
+    header('Location: /admin/fediverse?purged_followers=' . (int)$purged);
     exit;
   }
   if (isset($_POST['action']) && $_POST['action'] === 'unblock_domain') {
@@ -67,7 +100,7 @@ $domain   = kp_instance()['domain'];
 $followers = []; $blocked_domains = []; $blocked_users = []; $recent_episodes = [];
 $total_followers = 0; $total_notes = 0; $total_boosts = 0;
 try {
-  $followers       = kp_q("SELECT f.handle, f.handle as name, p.title as podcast_title, '#6b7280' as color, f.followed_at as since, 'Siguiendo a ' || p.title as action FROM ap_followers f JOIN podcasts p ON p.id = f.podcast_id ORDER BY f.followed_at DESC LIMIT 12") ?: [];
+  $followers       = kp_q("SELECT f.id, f.handle, f.handle as name, f.actor_url, f.inbox, p.title as podcast_title, '#6b7280' as color, f.followed_at as since, 'Siguiendo a ' || p.title as action FROM ap_followers f JOIN podcasts p ON p.id = f.podcast_id ORDER BY f.followed_at DESC LIMIT 50") ?: [];
   $blocked_domains = kp_q("SELECT domain, kind, created_at as since, reason FROM fediverse_blocks ORDER BY created_at DESC") ?: [];
   $total_followers = (int)(kp_one("SELECT count(*) c FROM ap_followers")['c'] ?? 0);
   $total_notes     = (int)(kp_one("SELECT count(*) c FROM ap_outbox WHERE type = 'Create'")['c'] ?? 0);
@@ -90,6 +123,11 @@ try {
     <?= icon('check', 16) ?> <?= __('fedi_clean_likes_success', 'Se han depurado los likes del Fediverso (:count eliminados/corregidos).', ['count' => (int)$_GET['cleaned']]) ?>
   </div>
 <?php endif; ?>
+<?php if (isset($_GET['purged_followers'])): ?>
+  <div class="alert success" style="margin-bottom:var(--gap);display:flex;align-items:center;gap:8px;padding:12px;background:#10b98122;color:#10b981;border-radius:8px;border:1px solid #10b98144;font-size:14px">
+    <?= icon('check', 16) ?> <?= __raw('queue_purged_count', 'Se han eliminado <strong>:count</strong> seguidores inaccesibles o con errores.', ['count' => (int)$_GET['purged_followers']]) ?>
+  </div>
+<?php endif; ?>
 
 <div class="page-head">
   <div>
@@ -97,6 +135,13 @@ try {
     <p class="page-sub"><?= __('fedi_sub', 'Federación ActivityPub · cada podcast es una cuenta citable desde Mastodon · cada episodio una nota') ?></p>
   </div>
   <div class="row" style="gap:8px">
+    <form method="POST" style="margin:0;padding:0;display:inline-block" onsubmit="return confirm('<?= e(__('fedi_confirm_clean_followers', '¿Deseas eliminar de la lista a todos los seguidores con entregas fallidas o inaccesibles?')) ?>')">
+      <?= kp_csrf_field() ?>
+      <input type="hidden" name="action" value="clean_dead_followers">
+      <button type="submit" class="btn" style="display:inline-flex;align-items:center;gap:6px">
+        <?= icon('userMinus', 13) ?> <?= __('fedi_clean_followers_btn', 'Depurar seguidores caídos') ?>
+      </button>
+    </form>
     <form method="POST" style="margin:0;padding:0;display:inline-block" onsubmit="return confirm('<?= e(__('fedi_confirm_clean_likes', '¿Deseas analizar y depurar likes duplicados o asignados erróneamente en los episodios?')) ?>')">
       <?= kp_csrf_field() ?>
       <input type="hidden" name="action" value="clean_likes">
@@ -222,7 +267,7 @@ try {
         <?php if (!$followers): ?>
       <div class="page-sub" style="padding:40px;text-align:center"><?= __('fedi_no_activity', 'Sin actividad federada todavía. Cuando alguien siga uno de tus podcasts desde Mastodon, aparecerá aquí.') ?></div>
     <?php endif; foreach ($followers as $f): ?>
-      <div style="display:grid;grid-template-columns:44px 1fr 1fr 240px;gap:18px;padding:14px 24px;align-items:center;border-bottom:1px solid var(--border);font-size:13.5px">
+      <div style="display:grid;grid-template-columns:44px 1fr 1fr 200px 40px;gap:18px;padding:14px 24px;align-items:center;border-bottom:1px solid var(--border);font-size:13.5px">
         <div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,<?= e($f['color']) ?>,<?= e($f['color']) ?>99);color:white;font-weight:700;display:grid;place-items:center"><?= e(strtoupper(substr($f['name']?:'?',0,1))) ?></div>
         <div>
           <div style="font-weight:500"><?= e($f['name']) ?></div>
@@ -230,6 +275,16 @@ try {
         </div>
         <div style="font-size:12.5px;color:var(--text-2)"><?= e($f['action']) ?></div>
         <div style="font-size:12px;color:var(--text-3)"><?= e($f['since']) ?></div>
+        <div style="text-align:right">
+          <form method="POST" style="margin:0;display:inline" onsubmit="return confirm('<?= e(__('fedi_confirm_delete_follower', '¿Deseas eliminar a este seguidor de la federación?')) ?>')">
+            <?= kp_csrf_field() ?>
+            <input type="hidden" name="action" value="delete_follower">
+            <input type="hidden" name="follower_id" value="<?= (int)($f['id'] ?? 0) ?>">
+            <button type="submit" class="btn btn-ghost" title="<?= __('delete', 'Eliminar') ?>" style="color:#ef4444;padding:4px">
+              <?= icon('trash', 14) ?>
+            </button>
+          </form>
+        </div>
       </div>
       <?php endforeach; ?>
       </div>

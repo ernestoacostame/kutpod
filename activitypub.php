@@ -171,7 +171,7 @@ function kp_ap_update_actor(int $podcastId): void {
   kp_alert('fediverse', 'Perfil actualizado', "El perfil del podcast en el Fediverso se ha encolado para actualización.", "");
 
   // Encolar entrega a todos los seguidores
-  $followers = kp_q("SELECT DISTINCT inbox FROM ap_followers WHERE podcast_id = ? AND inbox != ''", [$p['id']]);
+  $followers = kp_ap_get_follower_inboxes((int)$p['id']);
   $ins = kp_db()->prepare("INSERT INTO ap_delivery (outbox_id, inbox) VALUES (?, ?)");
   foreach ($followers as $f) {
       $ins->execute([$oid, $f['inbox']]);
@@ -544,7 +544,7 @@ function kp_ap_publish_episode(int $episodeId, bool $resend = false): void {
   }
 
   // Encolar entrega a cada follower
-  $followers = kp_q("SELECT DISTINCT inbox FROM ap_followers WHERE podcast_id = ? AND inbox != ''", [$p['id']]);
+  $followers = kp_ap_get_follower_inboxes((int)$p['id']);
   
   $ins = kp_db()->prepare("INSERT INTO ap_delivery (outbox_id, inbox) VALUES (?, ?)");
   foreach ($followers as $f) {
@@ -618,7 +618,7 @@ function kp_ap_delete_episode($episodeOrId): void {
 
   if (empty($notesToDelete)) return;
 
-  $followers = kp_q("SELECT DISTINCT inbox FROM ap_followers WHERE podcast_id = ? AND inbox != ''", [$p['id']]);
+  $followers = kp_ap_get_follower_inboxes((int)$p['id']);
   $ins = kp_db()->prepare("INSERT INTO ap_delivery (outbox_id, inbox) VALUES (?, ?)");
 
   foreach (array_keys($notesToDelete) as $noteId) {
@@ -664,10 +664,46 @@ function kp_ap_trigger_delivery(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers de seguidores federados: filtrado de bloqueos y purga de inactivos
+// ---------------------------------------------------------------------------
+function kp_ap_get_follower_inboxes(int $podcastId): array {
+  $rows = kp_q("SELECT DISTINCT inbox FROM ap_followers WHERE podcast_id = ? AND inbox != ''", [$podcastId]);
+  if (!$rows) return [];
+
+  $blocked = kp_q("SELECT domain FROM fediverse_blocks");
+  if (!$blocked) return $rows;
+
+  $blockedDomains = array_filter(array_map('strtolower', array_column($blocked, 'domain')));
+  $valid = [];
+  foreach ($rows as $r) {
+    $host = strtolower(parse_url($r['inbox'], PHP_URL_HOST) ?? '');
+    if ($host && in_array($host, $blockedDomains, true)) {
+      continue;
+    }
+    $valid[] = $r;
+  }
+  return $valid;
+}
+
+function kp_ap_remove_follower_by_inbox(string $inbox, string $reason = ''): void {
+  kp_ap_log("Seguidor eliminado permanentemente de ap_followers por inbox: $inbox. Motivo: $reason");
+  try {
+    kp_db()->prepare("DELETE FROM ap_followers WHERE inbox = ?")->execute([$inbox]);
+    kp_db()->prepare("UPDATE ap_delivery SET status='failed', last_error=? WHERE inbox = ? AND status='pending'")
+          ->execute(["Seguidor eliminado: $reason", $inbox]);
+  } catch (Throwable $e) {
+    kp_ap_log("Error al eliminar seguidor por inbox $inbox: " . $e->getMessage());
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Worker de entrega · drena ap_delivery con backoff exponencial
 // Invocar desde cron: php cli/ap-deliver.php
 // ---------------------------------------------------------------------------
 function kp_ap_deliver_pending(int $batch = 50): int {
+  @set_time_limit(0);
+  @ignore_user_abort(true);
+
   $rows = kp_q("SELECT * FROM ap_delivery 
                 WHERE status = 'pending' AND next_try <= datetime('now', '+1 minute')
                 ORDER BY id LIMIT ?", [$batch]);
@@ -680,17 +716,44 @@ function kp_ap_deliver_pending(int $batch = 50): int {
           continue;
       }
 
+      // Descartar de inmediato si el dominio destino está en la lista de bloqueados
+      $host = strtolower(parse_url($d['inbox'], PHP_URL_HOST) ?? '');
+      if ($host) {
+        $isBlocked = kp_one("SELECT domain FROM fediverse_blocks WHERE LOWER(domain) = ? LIMIT 1", [$host]);
+        if ($isBlocked) {
+          kp_db()->prepare("UPDATE ap_delivery SET status='failed', last_error='Dominio bloqueado' WHERE id = ?")->execute([$d['id']]);
+          kp_ap_remove_follower_by_inbox($d['inbox'], "Dominio bloqueado: $host");
+          continue;
+        }
+      }
+
       kp_ap_post_signed($d['inbox'], $outbox['object_json'], (int)$outbox['podcast_id']);
       kp_db()->prepare("UPDATE ap_delivery SET status='delivered', delivered_at=datetime('now') WHERE id = ?")
             ->execute([$d['id']]);
       $sent++;
     } catch (Throwable $e) {
       $attempts = $d['attempts'] + 1;
-      $backoff = min(86400, pow(2, $attempts) * 60); // hasta 1 día
-      $next = gmdate('Y-m-d H:i:s', time() + $backoff);
-      $status = $attempts >= 8 ? 'failed' : 'pending';
-      kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, next_try=?, status=? WHERE id = ?")
-            ->execute([$attempts, $e->getMessage(), $next, $status, $d['id']]);
+      $httpCode = (int)$e->getCode();
+      $isGone = ($httpCode === 410 || $httpCode === 404);
+
+      // Si el servidor remoto indica que el recurso ya no existe (410 Gone / 404 Not Found)
+      // o si se alcanzaron 6 intentos fallidos consecutivos:
+      if ($isGone) {
+        $msg = "HTTP $httpCode: Seguidor o inbox ya no existe. Eliminado de seguidores.";
+        kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, status='failed' WHERE id = ?")
+              ->execute([$attempts, $msg, $d['id']]);
+        kp_ap_remove_follower_by_inbox($d['inbox'], "HTTP $httpCode (Recurso no encontrado o eliminado)");
+      } elseif ($attempts >= 6) {
+        $msg = "Agotados intentos máximos ($attempts): " . $e->getMessage();
+        kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, status='failed' WHERE id = ?")
+              ->execute([$attempts, $msg, $d['id']]);
+        kp_ap_remove_follower_by_inbox($d['inbox'], "Agotados intentos máximos de entrega ($attempts)");
+      } else {
+        $backoff = min(86400, pow(2, $attempts) * 60); // hasta 1 día
+        $next = gmdate('Y-m-d H:i:s', time() + $backoff);
+        kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, next_try=?, status='pending' WHERE id = ?")
+              ->execute([$attempts, $e->getMessage(), $next, $d['id']]);
+      }
     }
   }
   return $sent;
@@ -730,16 +793,18 @@ function kp_ap_post_signed(string $url, string $body, int $podcastId): void {
     ],
     CURLOPT_USERAGENT => 'KutPod/1.0 (+' . kp_ap_base() . ')',
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_TIMEOUT => 20,
-    CURLOPT_FAILONERROR => true,
+    CURLOPT_CONNECTTIMEOUT => 5,
+    CURLOPT_TIMEOUT => 12,
+    CURLOPT_FAILONERROR => false,
   ]);
   $resp = curl_exec($ch);
   $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
   $err = curl_error($ch);
   curl_close($ch);
   if ($http >= 400 || $resp === false) {
-    kp_ap_log("Entrega fallida a $url: HTTP $http $err. Respuesta: " . substr((string)$resp, 0, 300));
-    throw new RuntimeException("HTTP $http $err");
+    $errDetail = $err ? "curl error: $err" : "HTTP $http " . substr((string)$resp, 0, 150);
+    kp_ap_log("Entrega fallida a $url: $errDetail");
+    throw new RuntimeException($errDetail, $http ?: 500);
   }
   kp_ap_log("Entrega exitosa a $url: HTTP $http");
 }

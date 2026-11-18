@@ -691,14 +691,36 @@ function kp_ap_get_follower_inboxes(int $podcastId): array {
   return $valid;
 }
 
-function kp_ap_remove_follower_by_inbox(string $inbox, string $reason = ''): void {
-  kp_ap_log("Seguidor eliminado permanentemente de ap_followers por inbox: $inbox. Motivo: $reason");
+function kp_ap_remove_follower_by_inbox(string $inbox, string $reason = '', ?int $podcastId = null): void {
+  kp_ap_log("Seguidor eliminado de ap_followers por inbox: $inbox" . ($podcastId ? " (podcast #$podcastId)" : '') . ". Motivo: $reason");
   try {
-    kp_db()->prepare("DELETE FROM ap_followers WHERE inbox = ?")->execute([$inbox]);
+    if ($podcastId) {
+      kp_db()->prepare("DELETE FROM ap_followers WHERE inbox = ? AND podcast_id = ?")->execute([$inbox, $podcastId]);
+    } else {
+      kp_db()->prepare("DELETE FROM ap_followers WHERE inbox = ?")->execute([$inbox]);
+    }
     kp_db()->prepare("UPDATE ap_delivery SET status='failed', last_error=? WHERE inbox = ? AND status='pending'")
           ->execute(["Seguidor eliminado: $reason", $inbox]);
   } catch (Throwable $e) {
     kp_ap_log("Error al eliminar seguidor por inbox $inbox: " . $e->getMessage());
+  }
+}
+
+// ¿Un inbox lleva realmente muerto? Un fallo puntual (caída, reinicio, 5xx, timeout) NO basta:
+// exige cero entregas correctas en 14 días y ≥3 entregas fallidas, la más antigua con más de 7 días.
+function kp_ap_inbox_is_dead(string $inbox): bool {
+  try {
+    $okSince = gmdate('Y-m-d H:i:s', time() - 14 * 86400);
+    $ok = kp_one("SELECT COUNT(*) c FROM ap_delivery WHERE inbox = ? AND status = 'delivered' AND delivered_at >= ?", [$inbox, $okSince]);
+    if ((int)($ok['c'] ?? 0) > 0) return false;
+    $failSince = gmdate('Y-m-d H:i:s', time() - 30 * 86400);
+    $f = kp_one("SELECT COUNT(*) c, MIN(o.published) first_at
+                 FROM ap_delivery d JOIN ap_outbox o ON o.id = d.outbox_id
+                 WHERE d.inbox = ? AND d.status = 'failed' AND o.published >= ?", [$inbox, $failSince]);
+    $weekAgo = gmdate('Y-m-d H:i:s', time() - 7 * 86400);
+    return (int)($f['c'] ?? 0) >= 3 && !empty($f['first_at']) && $f['first_at'] <= $weekAgo;
+  } catch (Throwable $e) {
+    return false; // ante la duda, conservar al seguidor
   }
 }
 
@@ -740,7 +762,7 @@ function kp_ap_deliver_pending(int $batch = 50): int {
     } catch (Throwable $e) {
       $attempts = $d['attempts'] + 1;
       $httpCode = (int)$e->getCode();
-      $isGone = ($httpCode === 410 || $httpCode === 404);
+      $isGone = ($httpCode === 410); // 404 puede ser transitorio (ruta/servidor en mantenimiento)
 
       // Si el servidor remoto indica que el recurso ya no existe (410 Gone / 404 Not Found)
       // o si se alcanzaron 6 intentos fallidos consecutivos:
@@ -748,12 +770,16 @@ function kp_ap_deliver_pending(int $batch = 50): int {
         $msg = "HTTP $httpCode: Seguidor o inbox ya no existe. Eliminado de seguidores.";
         kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, status='failed' WHERE id = ?")
               ->execute([$attempts, $msg, $d['id']]);
-        kp_ap_remove_follower_by_inbox($d['inbox'], "HTTP $httpCode (Recurso no encontrado o eliminado)");
+        kp_ap_remove_follower_by_inbox($d['inbox'], "HTTP $httpCode (Gone)", (int)($outbox['podcast_id'] ?? 0) ?: null);
       } elseif ($attempts >= 6) {
         $msg = "Agotados intentos máximos ($attempts): " . $e->getMessage();
         kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, status='failed' WHERE id = ?")
               ->execute([$attempts, $msg, $d['id']]);
-        kp_ap_remove_follower_by_inbox($d['inbox'], "Agotados intentos máximos de entrega ($attempts)");
+        if (kp_ap_inbox_is_dead($d['inbox'])) {
+          kp_ap_remove_follower_by_inbox($d['inbox'], "Inbox sin entregas correctas en 14 días ($attempts intentos en este envío)", (int)($outbox['podcast_id'] ?? 0) ?: null);
+        } else {
+          kp_ap_log("Entrega fallida tras $attempts intentos a {$d['inbox']}; se CONSERVA el seguidor (fallo posiblemente transitorio).");
+        }
       } else {
         $backoff = min(86400, pow(2, $attempts) * 60); // hasta 1 día
         $next = gmdate('Y-m-d H:i:s', time() + $backoff);

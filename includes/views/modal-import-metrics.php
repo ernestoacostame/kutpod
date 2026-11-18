@@ -45,12 +45,12 @@ $allPodcasts = kp_q("SELECT id, title, slug FROM podcasts WHERE hidden = 0 ORDER
       </div>
 
       <div class="field" style="margin-bottom:16px">
-        <label class="label" style="font-size:12px;font-weight:600;margin-bottom:4px"><?= __('analytics_import_file_label', 'Archivo CSV (.csv)') ?></label>
+        <label class="label" style="font-size:12px;font-weight:600;margin-bottom:4px"><?= __('analytics_import_file_label', 'Archivos CSV (.csv o .zip)') ?></label>
         <div id="import-drop-zone" style="border:2px dashed var(--border);border-radius:10px;padding:22px;text-align:center;background:var(--surface-2);cursor:pointer;transition:border-color .2s, background .2s">
-          <div style="opacity:.6;margin-bottom:6px"><?= icon('fileText', 28) ?></div>
-          <div id="import-file-name" style="font-size:13px;font-weight:500;color:var(--text-1)"><?= __('analytics_import_drop_hint', 'Arrastra tu CSV aquí o haz clic para seleccionarlo') ?></div>
-          <div style="font-size:11.5px;color:var(--text-3);margin-top:4px"><?= __('analytics_import_compat_hint', 'Compatible con exportaciones de Apple y Spotify (UTF-8 y UTF-16)') ?></div>
-          <input type="file" name="file" id="import-metrics-file" accept=".csv,text/csv,text/plain" required style="display:none">
+          <div style="opacity:.6;margin-bottom:6px"><?= icon('file', 28) ?></div>
+          <div id="import-file-name" style="font-size:13px;font-weight:500;color:var(--text-1)"><?= __('analytics_import_drop_hint', 'Arrastra uno o varios CSV aquí (o un .zip) o haz clic para seleccionarlos') ?></div>
+          <div style="font-size:11.5px;color:var(--text-3);margin-top:4px"><?= __('analytics_import_compat_hint', 'Puedes seleccionar varios CSV a la vez. Compatible con Apple Podcasts y Spotify for Creators.') ?></div>
+          <input type="file" name="files[]" id="import-metrics-file" accept=".csv,text/csv,text/plain,.zip,application/zip" multiple style="display:none">
         </div>
       </div>
 
@@ -111,35 +111,46 @@ function openImportMetricsModal(podcastId, podcastTitle) {
     dropZone.style.background = 'var(--surface-2)';
   });
 
+  function updateFileLabels(fileList) {
+    if (!fileList || fileList.length === 0) {
+      fileName.textContent = '<?= addslashes(__('analytics_import_drop_hint', 'Arrastra uno o varios CSV aquí (o un .zip) o haz clic para seleccionarlos')) ?>';
+      return;
+    }
+    if (fileList.length === 1) {
+      fileName.textContent = fileList[0].name;
+    } else {
+      fileName.textContent = `📁 ${fileList.length} archivos seleccionados (${fileList[0].name}, +${fileList.length - 1} más)`;
+    }
+  }
+
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.style.borderColor = 'var(--border)';
     dropZone.style.background = 'var(--surface-2)';
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       fileInput.files = e.dataTransfer.files;
-      fileName.textContent = e.dataTransfer.files[0].name;
+      updateFileLabels(fileInput.files);
     }
   });
 
   fileInput.addEventListener('change', () => {
-    if (fileInput.files && fileInput.files.length > 0) {
-      fileName.textContent = fileInput.files[0].name;
-    }
+    updateFileLabels(fileInput.files);
   });
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (!fileInput.files || fileInput.files.length === 0) {
-      alert('Por favor selecciona un archivo CSV.');
+      alert('Por favor selecciona al menos un archivo CSV o ZIP.');
       return;
     }
 
+    const count = fileInput.files.length;
     submitBtn.disabled = true;
-    submitBtn.innerHTML = 'Procesando...';
+    submitBtn.innerHTML = 'Procesando ' + count + ' archivo(s)...';
     statusArea.style.display = 'block';
     statusArea.style.background = 'var(--surface-2)';
     statusArea.style.color = 'var(--text-1)';
-    statusArea.innerHTML = 'Analizando archivo CSV y vinculando episodios...';
+    statusArea.innerHTML = `Analizando ${count} archivo(s) y consolidando métricas...`;
 
     const formData = new FormData(form);
     formData.append('ajax', '1');
@@ -159,14 +170,15 @@ function openImportMetricsModal(podcastId, podcastTitle) {
         throw new Error(data.message || data.error || 'Error desconocido al importar CSV');
       }
 
-      const pLabel = (data.platform === 'apple') ? 'Apple Podcasts' : ((data.platform === 'spotify') ? 'Spotify' : 'CSV');
+      const pLabel = data.platform_label || 'CSV';
+      const fileSummary = data.total_files ? `${data.total_files} archivo(s)` : `${count} archivo(s)`;
       statusArea.style.background = 'rgba(34, 197, 94, 0.15)';
       statusArea.style.color = '#22c55e';
-      statusArea.innerHTML = `<strong>✅ Éxito:</strong> Se vincularon las métricas de <strong>${data.matched}</strong> episodios (${pLabel}). Actualizando pantalla...`;
+      statusArea.innerHTML = `<strong>✅ Éxito:</strong> Se procesaron <strong>${fileSummary}</strong> y se consolidaron métricas para <strong>${data.matched}</strong> episodios (${pLabel}). Actualizando pantalla...`;
 
       setTimeout(() => {
         window.location.reload();
-      }, 1200);
+      }, 1400);
 
     } catch (err) {
       submitBtn.disabled = false;

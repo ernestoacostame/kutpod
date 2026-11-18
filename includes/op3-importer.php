@@ -389,11 +389,11 @@ function kp_op3_import_external_csv(int $podcastId, string $platformOverride, st
     )
     ON CONFLICT(episode_id, platform) DO UPDATE SET
       source_file       = excluded.source_file,
-      plays             = excluded.plays,
-      listeners         = excluded.listeners,
-      avg_playback_secs = excluded.avg_playback_secs,
-      completion_pct    = excluded.completion_pct,
-      total_time_secs   = excluded.total_time_secs,
+      plays             = CASE WHEN excluded.plays > 0 THEN excluded.plays ELSE external_platform_stats.plays END,
+      listeners         = CASE WHEN excluded.listeners > 0 THEN excluded.listeners ELSE external_platform_stats.listeners END,
+      avg_playback_secs = CASE WHEN excluded.avg_playback_secs > 0 THEN excluded.avg_playback_secs ELSE external_platform_stats.avg_playback_secs END,
+      completion_pct    = CASE WHEN excluded.completion_pct > 0.0 THEN excluded.completion_pct ELSE external_platform_stats.completion_pct END,
+      total_time_secs   = CASE WHEN excluded.total_time_secs > 0 THEN excluded.total_time_secs ELSE external_platform_stats.total_time_secs END,
       raw_data          = excluded.raw_data,
       imported_at       = datetime('now')
   ");

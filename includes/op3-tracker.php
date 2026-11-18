@@ -40,6 +40,7 @@ function kp_op3_ensure_schema(): void {
     )");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_hits_unproc ON op3_hits(processed, hour)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_hits_ep ON op3_hits(episode_id, ts)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_hits_pending ON op3_hits(id) WHERE processed = 0");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS op3_downloads (
       download_hash TEXT NOT NULL,
@@ -60,6 +61,7 @@ function kp_op3_ensure_schema(): void {
     )");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_dl_ep_date ON op3_downloads(episode_id, date)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_dl_pod_date ON op3_downloads(podcast_id, date)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_dl_date_bot ON op3_downloads(date, bot_type)");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS op3_stats_daily (
       date         TEXT NOT NULL,
@@ -164,33 +166,33 @@ function kp_op3_track_and_redirect(string $showSlug, string $episodeSlug): void 
   kp_do_action('op3_tracker_init', $showSlug, $episodeSlug);
   kp_op3_ensure_schema();
 
-  $ep = kp_one("SELECT e.*, p.id as p_id, p.slug as p_slug, p.op3 as p_op3
+  $ep = kp_one("SELECT e.id, e.audio_url, p.id as p_id, p.slug as p_slug, p.op3 as p_op3
                 FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
-                WHERE LOWER(p.slug) = LOWER(?) AND LOWER(e.slug) = LOWER(?) AND e.status = 'published'",
+                WHERE p.slug = ? COLLATE NOCASE AND e.slug = ? COLLATE NOCASE AND e.status = 'published'",
                 [$showSlug, $episodeSlug]);
 
   if (!$ep) {
     // 1) Lógica de rescate: Intentar quitando el timestamp de Castopod
     $cleanSlug = preg_replace('/-[0-9]{8,12}$/', '', $episodeSlug);
     if ($cleanSlug !== $episodeSlug) {
-      $ep = kp_one("SELECT e.*, p.id as p_id, p.slug as p_slug, p.op3 as p_op3
+      $ep = kp_one("SELECT e.id, e.audio_url, p.id as p_id, p.slug as p_slug, p.op3 as p_op3
                     FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
-                    WHERE LOWER(p.slug) = LOWER(?) AND LOWER(e.slug) = LOWER(?) AND e.status = 'published'",
+                    WHERE p.slug = ? COLLATE NOCASE AND e.slug = ? COLLATE NOCASE AND e.status = 'published'",
                     [$showSlug, $cleanSlug]);
     }
     
     // 2) Lógica de rescate extrema: Buscar por prefijo (por si el slug se recortó)
     if (!$ep) {
-      $ep = kp_one("SELECT e.*, p.id as p_id, p.slug as p_slug, p.op3 as p_op3
+      $ep = kp_one("SELECT e.id, e.audio_url, p.id as p_id, p.slug as p_slug, p.op3 as p_op3
                     FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
-                    WHERE LOWER(p.slug) = LOWER(?) AND e.slug LIKE ? AND e.status = 'published'
+                    WHERE p.slug = ? COLLATE NOCASE AND e.slug LIKE ? AND e.status = 'published'
                     ORDER BY length(e.slug) DESC LIMIT 1",
                     [$showSlug, $episodeSlug . '%']);
     }
 
     // 3) Rescate por IDs numéricos si los parámetros son enteros
     if (!$ep && is_numeric($showSlug) && is_numeric($episodeSlug)) {
-      $ep = kp_one("SELECT e.*, p.id as p_id, p.slug as p_slug, p.op3 as p_op3
+      $ep = kp_one("SELECT e.id, e.audio_url, p.id as p_id, p.slug as p_slug, p.op3 as p_op3
                     FROM episodes e JOIN podcasts p ON p.id = e.podcast_id
                     WHERE p.id = ? AND e.id = ? AND e.status = 'published'",
                     [(int)$showSlug, (int)$episodeSlug]);

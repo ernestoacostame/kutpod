@@ -98,3 +98,25 @@ RewriteRule ^storage/(?!media/)  -  [F,L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^(.+)$  /site.php?r=home  [QSA,L]
+
+# ----------------------------------------------------------------------------
+# 9) Rendimiento · compresión y caché de estáticos
+#    (los assets se referencian con ?v=filemtime, así que son seguros de cachear)
+# ----------------------------------------------------------------------------
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml
+  AddOutputFilterByType DEFLATE application/javascript text/javascript application/x-javascript
+  AddOutputFilterByType DEFLATE application/rss+xml application/xml application/atom+xml
+  AddOutputFilterByType DEFLATE application/json application/activity+json application/ld+json
+</IfModule>
+
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType text/javascript "access plus 1 year"
+  ExpiresByType image/webp "access plus 30 days"
+  ExpiresByType image/jpeg "access plus 30 days"
+  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/svg+xml "access plus 30 days"
+</IfModule>

@@ -197,6 +197,7 @@ $set->execute(['owner_name', $name]);
 $set->execute(['owner_email', $email]);
 $set->execute(['site_language', $lang]);
 $set->execute(['installed_at', date('c')]);
+$set->execute(['enable_cache', '1']);
 out('settings cargadas', 'ok');
 
 // Seed bot rules (offline, ~5 patrones). Después sincroniza desde el panel.

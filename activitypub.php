@@ -23,6 +23,9 @@ if (!kp_plugin_is_active('fediverse') && ((isset($_SERVER['SCRIPT_FILENAME']) &&
 // Esquema · claves RSA + cola de entrega + actividades salientes
 // ---------------------------------------------------------------------------
 function kp_ap_ensure_schema(): void {
+  static $done = false;
+  if ($done) return;
+  $done = true;
   $pdo = kp_db();
   $pdo->exec("CREATE TABLE IF NOT EXISTS ap_keys (
     podcast_id  INTEGER PRIMARY KEY REFERENCES podcasts(id) ON DELETE CASCADE,
@@ -59,6 +62,9 @@ function kp_ap_ensure_schema(): void {
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(episode_id, actor_url)
   )");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_apd_status_next ON ap_delivery(status, next_try)");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_apd_inbox_status ON ap_delivery(inbox, status)");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_apo_podcast_id ON ap_outbox(podcast_id, id)");
 }
 kp_ap_ensure_schema();
 

@@ -377,6 +377,33 @@ function kp_db(): PDO {
       $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '13') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
     } catch (Throwable $e) {}
   }
+  if ($current_version < 14) {
+    // Versión 14: índices de rendimiento + caché habilitada por defecto (solo si no existe el ajuste)
+    try {
+      $hasTbl = function (string $t) use ($pdo): bool {
+        return (bool)$pdo->query("SELECT 1 FROM sqlite_master WHERE type='table' AND name=" . $pdo->quote($t))->fetchColumn();
+      };
+      $idx = [
+        ['episodes',       "CREATE INDEX IF NOT EXISTS idx_episodes_slug_nc ON episodes(slug COLLATE NOCASE)"],
+        ['podcasts',       "CREATE INDEX IF NOT EXISTS idx_podcasts_slug_nc ON podcasts(slug COLLATE NOCASE)"],
+        ['episodes',       "CREATE INDEX IF NOT EXISTS idx_episodes_scheduled ON episodes(status, publish_at) WHERE status = 'scheduled'"],
+        ['op3_downloads',  "CREATE INDEX IF NOT EXISTS idx_dl_date_bot ON op3_downloads(date, bot_type)"],
+        ['op3_hits',       "CREATE INDEX IF NOT EXISTS idx_hits_pending ON op3_hits(id) WHERE processed = 0"],
+        ['ap_delivery',    "CREATE INDEX IF NOT EXISTS idx_apd_status_next ON ap_delivery(status, next_try)"],
+        ['ap_delivery',    "CREATE INDEX IF NOT EXISTS idx_apd_inbox_status ON ap_delivery(inbox, status)"],
+        ['ap_outbox',      "CREATE INDEX IF NOT EXISTS idx_apo_podcast_id ON ap_outbox(podcast_id, id)"],
+      ];
+      foreach ($idx as [$tbl, $sql]) {
+        if ($hasTbl($tbl)) { try { $pdo->exec($sql); } catch (Throwable $e) {} }
+      }
+      // Caché por defecto: no sobrescribe una elección explícita del usuario
+      $pdo->exec("INSERT OR IGNORE INTO settings (k,v) VALUES ('enable_cache', '1')");
+    } catch (Throwable $e) {}
+
+    try {
+      $pdo->exec("INSERT INTO settings (k,v) VALUES ('db_schema_version', '14') ON CONFLICT(k) DO UPDATE SET v=excluded.v, updated_at=datetime('now')");
+    } catch (Throwable $e) {}
+  }
   
   return $pdo;
 }

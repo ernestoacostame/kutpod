@@ -22,6 +22,7 @@ if (!function_exists('kp_cache_db')) {
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
         
+        $pdo->exec('PRAGMA busy_timeout = 3000');
         $pdo->exec('PRAGMA journal_mode = WAL');
         $pdo->exec('PRAGMA synchronous = NORMAL'); // Mayor velocidad
         

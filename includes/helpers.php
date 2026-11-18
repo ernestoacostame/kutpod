@@ -102,24 +102,9 @@ function kp_set_lang(string $lang): void {
   }
 }
 
-function __(string $key, $fallback = '', array $replace = []): string {
-  if (is_array($fallback)) {
-    $replace = $fallback;
-    $fallback = '';
-  }
-  static $strings = null;
-  static $loadedLang = null;
-  $lang = kp_detect_lang();
-  if ($strings === null || $loadedLang !== $lang) {
-    $loadedLang = $lang;
-    $file = __DIR__ . "/lang/{$lang}.php";
-    $strings = file_exists($file) ? require $file : [];
-    $fallbackFile = __DIR__ . "/lang/es.php";
-    if ($lang !== 'es' && file_exists($fallbackFile)) {
-      $esStrings = require $fallbackFile;
-      $strings = array_merge($esStrings, $strings);
-    }
-  }
+// Carga única (cacheada por request e idioma) de cadenas de idioma, con fallback a es.
+function kp_lang_strings(): array {
+  $strings = kp_lang_strings();
   $text = $strings[$key] ?? ($fallback !== '' ? $fallback : $key);
   if (strpos($text, '|') !== false && isset($replace['count'])) {
     $parts = explode('|', $text);
@@ -138,19 +123,7 @@ function __raw(string $key, $fallback = '', array $replace = []): string {
     $replace = $fallback;
     $fallback = '';
   }
-  static $strings_raw = null;
-  static $loadedLangRaw = null;
-  $lang = kp_detect_lang();
-  if ($strings_raw === null || $loadedLangRaw !== $lang) {
-    $loadedLangRaw = $lang;
-    $file = __DIR__ . "/lang/{$lang}.php";
-    $strings_raw = file_exists($file) ? require $file : [];
-    $fallbackFile = __DIR__ . "/lang/es.php";
-    if ($lang !== 'es' && file_exists($fallbackFile)) {
-      $esStrings = require $fallbackFile;
-      $strings_raw = array_merge($esStrings, $strings_raw);
-    }
-  }
+  $strings_raw = kp_lang_strings();
   $text = $strings_raw[$key] ?? ($fallback !== '' ? $fallback : $key);
   if (strpos($text, '|') !== false && isset($replace['count'])) {
     $parts = explode('|', $text);

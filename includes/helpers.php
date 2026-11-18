@@ -372,6 +372,14 @@ function ep_row(array $ep, bool $podcastView = false): string {
   $publicUrl = kp_get_protocol() . '://' . kp_handle_domain() . '/@' . rawurlencode($ep['podcast']) . '/' . rawurlencode($ep['id']);
   $copyBtnHtml = '<button class="admin-copy-url-btn" data-url="' . e($publicUrl) . '" style="background:none;border:none;padding:0;font-family:inherit;font-size:11.5px;color:var(--text-3);cursor:pointer;display:inline-flex;align-items:center;gap:3px;text-decoration:underline;vertical-align:middle;margin-left:2px" onmouseover="this.style.color=\'var(--text-2)\'" onmouseout="this.style.color=\'var(--text-3)\'">' . icon('copy', 11) . ' <span>' . __('copy_link') . '</span></button>';
 
+  $avgPlaybackSub = '';
+  if (!empty($ep['duration']) && $ep['duration'] !== '—' && !empty($ep['db_id']) && function_exists('kp_op3_episode_playback_stats')) {
+    $epPb = kp_op3_episode_playback_stats((int)$ep['db_id'], 30);
+    if (!empty($epPb['avg_playback_fmt']) && $epPb['avg_playback_fmt'] !== '—') {
+      $avgPlaybackSub = '<div style="font-size:10.5px;color:var(--text-3);margin-top:2px" title="' . e(__('ep_col_avg_playback', 'Tiempo promedio de reproducción')) . '">Avg: ' . e($epPb['avg_playback_fmt']) . ' (' . $epPb['completion_pct'] . '%)</div>';
+    }
+  }
+
   return '<div style="display:grid;grid-template-columns:40px 1.6fr 1fr 90px 100px 90px 80px;gap:14px;align-items:center;padding:12px 8px;border-top:1px solid var(--border)">
     ' . $coverHtml . '
     <div>
@@ -383,7 +391,7 @@ function ep_row(array $ep, bool $podcastView = false): string {
       </div>
     </div>
     ' . $col3Html . '
-    <div class="tabular" style="font-size:13px">'.e($ep['duration']).'</div>
+    <div class="tabular" style="font-size:13px">'.e($ep['duration']).$avgPlaybackSub.'</div>
     <div class="tabular" style="font-size:13px">'.number_format($ep['downloads']).'</div>
     <div><span class="tag '.e($ep['status']).'">'.e($ep['status']).'</span></div>
     <div style="text-align:right"><a href="/admin/new-episode?id='.urlencode($ep['id']).'&podcast='.urlencode($ep['podcast']).'" class="btn" style="padding:4px 8px;font-size:12px;color:var(--accent);border-color:var(--accent)">'.icon('edit',13).' ' . __('ep_action_edit') . '</a></div>

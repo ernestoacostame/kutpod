@@ -2,6 +2,71 @@
 (() => {
   const audio = new Audio();
   let state = { ep: null, podcast: null, playing: false, speed: 1 };
+  let activeEpParam = null;
+  let activePodParam = null;
+  let accumulatedSeconds = 0;
+  let lastTick = null;
+  let startReported = false;
+  let completedReported = false;
+
+  function sendTelemetry(isBeacon = false) {
+    if (!activeEpParam || accumulatedSeconds <= 0) return;
+    const secsToSend = Math.round(accumulatedSeconds);
+    accumulatedSeconds = 0;
+    const body = JSON.stringify({
+      episode_id: activeEpParam,
+      podcast_id: activePodParam,
+      listened_secs: secsToSend,
+      is_start: !startReported,
+      is_completed: completedReported
+    });
+    startReported = true;
+    if (isBeacon && navigator.sendBeacon) {
+      navigator.sendBeacon('/api/v1/playback', body);
+    } else {
+      fetch('/api/v1/playback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: body,
+        keepalive: true
+      }).catch(() => {});
+    }
+  }
+
+  setInterval(() => {
+    if (!audio.paused && accumulatedSeconds >= 5) {
+      sendTelemetry();
+    }
+  }, 15000);
+
+  audio.addEventListener('timeupdate', () => {
+    const now = Date.now();
+    if (!audio.paused && lastTick) {
+      const dt = (now - lastTick) / 1000;
+      if (dt > 0 && dt < 4) {
+        accumulatedSeconds += dt;
+      }
+    }
+    lastTick = now;
+    if (audio.duration && !completedReported && (audio.currentTime / audio.duration) >= 0.8) {
+      completedReported = true;
+      sendTelemetry();
+    }
+  });
+
+  audio.addEventListener('pause', () => {
+    lastTick = null;
+    sendTelemetry();
+  });
+
+  audio.addEventListener('ended', () => {
+    completedReported = true;
+    sendTelemetry();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    sendTelemetry(true);
+  });
 
   function $(s, r = document) { return r.querySelector(s); }
   function fmt(sec) { return Math.floor(sec/60) + ':' + String(Math.floor(sec%60)).padStart(2,'0'); }
@@ -200,9 +265,22 @@
     const targetSrc = dataEl.dataset.src;
     if (!targetSrc) return;
 
+    const m = (targetSrc || '').match(/\/r\/([^\/]+)\/([^\/]+)/);
+    const newEp = dataEl.dataset.epId || (m ? m[2] : null);
+    const newPod = dataEl.dataset.podcastId || (m ? m[1] : null);
+    if (activeEpParam && activeEpParam !== newEp) {
+      sendTelemetry(true);
+    }
+    activeEpParam = newEp;
+    activePodParam = newPod;
+
     const alreadyLoaded = isSameTrack(audio.src, targetSrc);
 
     if (!alreadyLoaded) {
+      startReported = false;
+      completedReported = false;
+      accumulatedSeconds = 0;
+      lastTick = null;
       audio.src = targetSrc;
       $('#kpTitle').textContent = dataEl.dataset.title || '';
       $('#kpSub').textContent = dataEl.dataset.podcast || '';

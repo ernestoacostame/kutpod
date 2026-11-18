@@ -94,6 +94,12 @@ if ($route === 'me' && $method === 'GET') {
     api_json(['user' => $u]);
 }
 
+// Match: v1/playback (y playback)
+if ($route === 'v1/playback' || $route === 'playback') {
+    require __DIR__ . '/handlers/playback.php';
+    exit;
+}
+
 // Match: v1/stats/export.csv (y stats/export.csv)
 if (($route === 'v1/stats/export.csv' || $route === 'stats/export.csv') && $method === 'GET') {
     require __DIR__ . '/handlers/stats_export.php';

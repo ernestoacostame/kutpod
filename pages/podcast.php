@@ -2,6 +2,8 @@
 // pages/podcast.php — detalle de show con tabla de episodios
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/op3-tracker.php';
+require_once __DIR__ . '/../includes/op3-stats.php';
 
 $id = $_GET['id'] ?? '';
 $p = kp_find_podcast($id) ?? kp_podcasts()[0];
@@ -100,6 +102,7 @@ if ($audioBytes > 0) {
     <?php else: ?>
       <button class="btn" disabled style="opacity:0.5;cursor:not-allowed" title="<?= __('pod_op3_disabled_hint', 'OP3 no está activo para este show') ?>"><?= icon('chart',13) ?> OP3</button>
     <?php endif; ?>
+    <a class="btn" href="/api/v1/stats/export.csv?podcast=<?= e($p['id']) ?>&range=30d" title="<?= __('analytics_export_csv', 'Exportar CSV') ?>"><?= icon('download',13) ?> <?= __('analytics_export_csv', 'Exportar CSV') ?></a>
     <a class="btn" href="/@<?= e($p['id']) ?>/feed.xml" target="_blank" download="feed.xml"><?= icon('rss',13) ?> <?= __('pod_export_rss', 'Exportar RSS') ?></a>
     <a class="btn" href="/admin/broadcast?podcast=<?= e($p['id']) ?>"><?= icon('globe',13) ?> Broadcast</a>
     <a class="btn" href="/admin/edit-podcast?id=<?= e($p['id']) ?>" style="color:var(--accent);border-color:var(--accent)"><?= icon('edit',13) ?> <?= __('edit', 'Editar') ?></a>
@@ -107,11 +110,16 @@ if ($audioBytes > 0) {
   </div>
 </div>
 
-<div class="stat-grid">
+<?php
+$pod_playback = kp_op3_podcast_playback_stats((int)$p['id'], 30);
+?>
+<div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
   <?= stat_card(__('pod_stat_episodes', 'Episodios'), (string)$p['episodes'], 'headphones', $subText ? ['sub'=>$subText] : []) ?>
   <?= stat_card(__('pod_stat_storage', 'Almacenamiento'), $formattedBytes, 'layers', ['sub'=>__('pod_stat_storage_sub', 'solo audios')]) ?>
   <?= stat_card(__('pod_stat_downloads_7d', 'Descargas · 7d'), fmt_num($p['downloads7']), 'download', ['delta'=>['dir'=>$p['growth']>=0?'up':'down','val'=>($p['growth']>=0?'+':'').$p['growth'].'%']]) ?>
   <?= stat_card(__('pod_stat_unique_listeners', 'Oyentes únicos'), fmt_num($p['unique_listeners'] ?? 0), 'users', ['sub' => __('pod_stat_listeners_op3_sub', 'estimado por OP3')]) ?>
+  <?= stat_card(__('pod_stat_avg_playback', 'Tiempo promedio'), $pod_playback['avg_playback_fmt'], 'clock', ['sub' => $pod_playback['avg_completion_pct'] . '% ' . __('pod_stat_retention_sub', 'retención media')]) ?>
+  <?= stat_card(__('pod_stat_total_listened', 'Tiempo consumido'), $pod_playback['total_time_fmt'], 'volumeHigh', ['sub' => __('pod_stat_sponsors_sub', 'atención de audiencia')]) ?>
 </div>
 
 <div class="card" style="margin-top:var(--gap)">

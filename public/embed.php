@@ -508,8 +508,53 @@ $embedLang = kp_detect_lang();
         audio.playbackRate = parseFloat(e.target.value);
       };
 
+      const epId = <?= (int)$ep['id'] ?>;
+      const podcastId = <?= (int)$p['id'] ?>;
+      let accumulatedSeconds = 0;
+      let lastTick = null;
+      let startReported = false;
+      let completedReported = false;
+
+      function sendTelemetry(isBeacon = false) {
+        if (!epId || accumulatedSeconds <= 0) return;
+        const secsToSend = Math.round(accumulatedSeconds);
+        accumulatedSeconds = 0;
+        const body = JSON.stringify({
+          episode_id: epId,
+          podcast_id: podcastId,
+          listened_secs: secsToSend,
+          is_start: !startReported,
+          is_completed: completedReported
+        });
+        startReported = true;
+        if (isBeacon && navigator.sendBeacon) {
+          navigator.sendBeacon('/api/v1/playback', body);
+        } else {
+          fetch('/api/v1/playback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: body,
+            keepalive: true
+          }).catch(() => {});
+        }
+      }
+
+      setInterval(() => {
+        if (!audio.paused && accumulatedSeconds >= 5) {
+          sendTelemetry();
+        }
+      }, 15000);
+
+      window.addEventListener('beforeunload', () => {
+        sendTelemetry(true);
+      });
+
       audio.onplay = updateUI;
-      audio.onpause = updateUI;
+      audio.onpause = () => {
+        updateUI();
+        lastTick = null;
+        sendTelemetry();
+      };
 
       audio.ondurationchange = () => {
         if (audio.duration && !isNaN(audio.duration)) {
@@ -518,6 +563,20 @@ $embedLang = kp_detect_lang();
       };
 
       audio.ontimeupdate = () => {
+        const now = Date.now();
+        if (!audio.paused && lastTick) {
+          const dt = (now - lastTick) / 1000;
+          if (dt > 0 && dt < 4) {
+            accumulatedSeconds += dt;
+          }
+        }
+        lastTick = now;
+
+        if (audio.duration && !completedReported && (audio.currentTime / audio.duration) >= 0.8) {
+          completedReported = true;
+          sendTelemetry();
+        }
+
         if (isDragging) return;
         const dur = audio.duration || 0;
         const cur = audio.currentTime || 0;
@@ -529,6 +588,8 @@ $embedLang = kp_detect_lang();
 
       // Cuando termina el audio, resetear al inicio
       audio.onended = () => {
+        completedReported = true;
+        sendTelemetry();
         audio.pause();
         audio.currentTime = 0;
         scrubFill.style.width = '0%';

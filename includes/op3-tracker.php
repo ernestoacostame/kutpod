@@ -21,81 +21,120 @@ function kp_op3_ensure_schema(): void {
 
   $pdo = kp_db();
   $has = $pdo->query("SELECT name FROM sqlite_master WHERE type='table' AND name='op3_hits'")->fetch();
-  if ($has) return;
-  $pdo->exec("CREATE TABLE IF NOT EXISTS op3_hits (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    ts           TEXT NOT NULL DEFAULT (datetime('now')),
-    hour         TEXT NOT NULL,
-    episode_id   INTEGER REFERENCES episodes(id) ON DELETE CASCADE,
-    podcast_id   INTEGER REFERENCES podcasts(id) ON DELETE CASCADE,
-    server_url   TEXT NOT NULL,
-    hashed_ip    TEXT NOT NULL,
-    user_agent   TEXT,
-    referer      TEXT,
-    range_header TEXT,
-    method       TEXT NOT NULL DEFAULT 'GET',
-    country      TEXT, region TEXT, region_name TEXT, timezone TEXT,
-    metro_code   TEXT, asn TEXT, continent TEXT,
-    processed    INTEGER NOT NULL DEFAULT 0
-  )");
-  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_hits_unproc ON op3_hits(processed, hour)");
-  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_hits_ep ON op3_hits(episode_id, ts)");
+  if (!$has) {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS op3_hits (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts           TEXT NOT NULL DEFAULT (datetime('now')),
+      hour         TEXT NOT NULL,
+      episode_id   INTEGER REFERENCES episodes(id) ON DELETE CASCADE,
+      podcast_id   INTEGER REFERENCES podcasts(id) ON DELETE CASCADE,
+      server_url   TEXT NOT NULL,
+      hashed_ip    TEXT NOT NULL,
+      user_agent   TEXT,
+      referer      TEXT,
+      range_header TEXT,
+      method       TEXT NOT NULL DEFAULT 'GET',
+      country      TEXT, region TEXT, region_name TEXT, timezone TEXT,
+      metro_code   TEXT, asn TEXT, continent TEXT,
+      processed    INTEGER NOT NULL DEFAULT 0
+    )");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_hits_unproc ON op3_hits(processed, hour)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_hits_ep ON op3_hits(episode_id, ts)");
 
-  $pdo->exec("CREATE TABLE IF NOT EXISTS op3_downloads (
-    download_hash TEXT NOT NULL,
-    date          TEXT NOT NULL,
-    ts            TEXT NOT NULL,
-    episode_id    INTEGER REFERENCES episodes(id) ON DELETE CASCADE,
-    podcast_id    INTEGER REFERENCES podcasts(id) ON DELETE CASCADE,
-    audience_id   TEXT NOT NULL,
-    hashed_ip     TEXT,
-    agent_type    TEXT, agent_name TEXT,
-    device_type   TEXT, device_name TEXT,
-    referrer_type TEXT, referrer_name TEXT,
-    country TEXT, region TEXT, region_name TEXT,
-    timezone TEXT, metro_code TEXT, asn TEXT, continent TEXT,
-    bot_type      TEXT,
-    tags          TEXT,
-    PRIMARY KEY (download_hash, date)
-  )");
-  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_dl_ep_date ON op3_downloads(episode_id, date)");
-  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_dl_pod_date ON op3_downloads(podcast_id, date)");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS op3_downloads (
+      download_hash TEXT NOT NULL,
+      date          TEXT NOT NULL,
+      ts            TEXT NOT NULL,
+      episode_id    INTEGER REFERENCES episodes(id) ON DELETE CASCADE,
+      podcast_id    INTEGER REFERENCES podcasts(id) ON DELETE CASCADE,
+      audience_id   TEXT NOT NULL,
+      hashed_ip     TEXT,
+      agent_type    TEXT, agent_name TEXT,
+      device_type   TEXT, device_name TEXT,
+      referrer_type TEXT, referrer_name TEXT,
+      country TEXT, region TEXT, region_name TEXT,
+      timezone TEXT, metro_code TEXT, asn TEXT, continent TEXT,
+      bot_type      TEXT,
+      tags          TEXT,
+      PRIMARY KEY (download_hash, date)
+    )");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_dl_ep_date ON op3_downloads(episode_id, date)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_dl_pod_date ON op3_downloads(podcast_id, date)");
 
-  $pdo->exec("CREATE TABLE IF NOT EXISTS op3_stats_daily (
-    date         TEXT NOT NULL,
-    episode_id   INTEGER NOT NULL,
-    podcast_id   INTEGER NOT NULL,
-    downloads    INTEGER NOT NULL DEFAULT 0,
-    unique_listeners INTEGER NOT NULL DEFAULT 0,
-    bot_downloads INTEGER NOT NULL DEFAULT 0,
+    $pdo->exec("CREATE TABLE IF NOT EXISTS op3_stats_daily (
+      date         TEXT NOT NULL,
+      episode_id   INTEGER NOT NULL,
+      podcast_id   INTEGER NOT NULL,
+      downloads    INTEGER NOT NULL DEFAULT 0,
+      unique_listeners INTEGER NOT NULL DEFAULT 0,
+      bot_downloads INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (date, episode_id)
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS op3_geo_daily (
+      date TEXT NOT NULL, episode_id INTEGER NOT NULL,
+      country TEXT, region TEXT, downloads INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (date, episode_id, country, region)
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS op3_apps_daily (
+      date TEXT NOT NULL, episode_id INTEGER NOT NULL,
+      app_name TEXT, device_type TEXT, downloads INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (date, episode_id, app_name, device_type)
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS op3_botip_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kind TEXT NOT NULL,          -- 'hash' | 'asn-pattern' | 'preload-widget'
+      rule_json TEXT NOT NULL,
+      source TEXT NOT NULL DEFAULT 'manual', -- 'op3-sync' | 'manual'
+      note TEXT,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_botip_kind ON op3_botip_rules(kind)");
+
+    // Seed inicial mínimo si está vacío. La sincronización real se hace via /op3-sync.
+    $count = (int) kp_one("SELECT count(*) c FROM op3_botip_rules")['c'];
+    if ($count === 0) kp_op3_seed_bot_rules();
+  }
+
+  // Telemetría de reproducción web / embed (sesiones y consumo medido)
+  $pdo->exec("CREATE TABLE IF NOT EXISTS op3_playback_daily (
+    date             TEXT NOT NULL,
+    episode_id       INTEGER NOT NULL,
+    podcast_id       INTEGER NOT NULL,
+    play_count       INTEGER NOT NULL DEFAULT 0,
+    completed_count  INTEGER NOT NULL DEFAULT 0,
+    total_secs       INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (date, episode_id)
   )");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_playback_pod ON op3_playback_daily(podcast_id, date)");
+}
 
-  $pdo->exec("CREATE TABLE IF NOT EXISTS op3_geo_daily (
-    date TEXT NOT NULL, episode_id INTEGER NOT NULL,
-    country TEXT, region TEXT, downloads INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (date, episode_id, country, region)
-  )");
+/**
+ * Registra segundos de reproducción y métricas de telemetría de oyentes web/embed.
+ */
+function kp_op3_record_playback(int $epId, int $podId, int $secs, bool $isStart = false, bool $isCompleted = false): void {
+  if ($epId <= 0 || $podId <= 0) return;
+  kp_op3_ensure_schema();
+  $date = gmdate('Y-m-d');
+  $secs = max(0, min(86400, $secs));
+  $startInc = $isStart ? 1 : 0;
+  $compInc = $isCompleted ? 1 : 0;
 
-  $pdo->exec("CREATE TABLE IF NOT EXISTS op3_apps_daily (
-    date TEXT NOT NULL, episode_id INTEGER NOT NULL,
-    app_name TEXT, device_type TEXT, downloads INTEGER NOT NULL DEFAULT 0,
-    PRIMARY KEY (date, episode_id, app_name, device_type)
-  )");
-
-  $pdo->exec("CREATE TABLE IF NOT EXISTS op3_botip_rules (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    kind TEXT NOT NULL,          -- 'hash' | 'asn-pattern' | 'preload-widget'
-    rule_json TEXT NOT NULL,
-    source TEXT NOT NULL DEFAULT 'manual', -- 'op3-sync' | 'manual'
-    note TEXT,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  )");
-  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_botip_kind ON op3_botip_rules(kind)");
-
-  // Seed inicial mínimo si está vacío. La sincronización real se hace via /op3-sync.
-  $count = (int) kp_one("SELECT count(*) c FROM op3_botip_rules")['c'];
-  if ($count === 0) kp_op3_seed_bot_rules();
+  $pdo = kp_db();
+  try {
+    $exists = kp_one("SELECT 1 FROM op3_playback_daily WHERE date = ? AND episode_id = ?", [$date, $epId]);
+    if ($exists) {
+      $pdo->prepare("UPDATE op3_playback_daily SET play_count = play_count + ?, completed_count = completed_count + ?, total_secs = total_secs + ? WHERE date = ? AND episode_id = ?")
+          ->execute([$startInc, $compInc, $secs, $date, $epId]);
+    } else {
+      $pdo->prepare("INSERT INTO op3_playback_daily (date, episode_id, podcast_id, play_count, completed_count, total_secs) VALUES (?, ?, ?, ?, ?, ?)")
+          ->execute([$date, $epId, $podId, $startInc, $compInc, $secs]);
+    }
+  } catch (Throwable $e) {
+    error_log('[OP3 playback] ' . $e->getMessage());
+  }
 }
 
 // ---------------------------------------------------------------------------

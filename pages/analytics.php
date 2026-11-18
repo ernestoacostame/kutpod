@@ -261,10 +261,15 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
 <?php else: ?>
 
   <!-- Tarjetas de resumen global -->
-  <div class="stat-grid <?= kp_plugin_is_active('youtube_stats') ? 'stat-grid-5' : '' ?>">
+  <?php
+    $global_playback = kp_op3_all_podcasts_playback_totals($days);
+  ?>
+  <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
     <?= stat_card(__('analytics_total_downloads', 'Descargas totales'), number_format($tot), 'download') ?>
     <?= stat_card(__('analytics_downloads_period', 'Descargas · :range', ['range' => $range]), number_format($tot_period), 'chart') ?>
     <?= stat_card(__('analytics_unique_listeners', 'Oyentes únicos'), number_format($unique_listeners), 'users', ['sub'=>__('analytics_identified_op3', 'identificados por OP3')]) ?>
+    <?= stat_card(__('analytics_avg_playback', 'Tiempo promedio'), $global_playback['avg_playback_fmt'], 'clock', ['sub' => $global_playback['avg_completion_pct'] . '% ' . __('analytics_avg_playback_sub', 'retención media')]) ?>
+    <?= stat_card(__('analytics_total_time_listened', 'Tiempo total escuchado'), $global_playback['total_time_fmt'], 'headphones', ['sub' => __('analytics_total_hours_sub', 'horas de atención')]) ?>
     <?= stat_card(__('analytics_active_podcasts', 'Podcasts activos'), (string)count($podcasts), 'mic') ?>
     <?php kp_do_action('analytics_stat_grid'); ?>
   </div>
@@ -424,11 +429,17 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
                   </div>
                   <div style="font-size:11.5px;color:var(--text-3);margin-top:2px">
                     <?= e($p['title']) ?> · S<?= (int)$ep['s'] ?> · E<?= (int)$ep['n'] ?>
+                    <?php if (!empty($ep['avg_playback_fmt']) && $ep['avg_playback_fmt'] !== '—'): ?>
+                      · <span title="Tiempo medio de escucha y retención"><?= e($ep['avg_playback_fmt']) ?> (<?= $ep['completion_pct'] ?>%)</span>
+                    <?php endif; ?>
                   </div>
                 </div>
                 <div class="tabular" style="text-align:right">
                   <div style="font-size:13.5px;font-weight:600"><?= fmt_num((int)$ep['downloads']) ?></div>
                   <div style="font-size:10.5px;color:var(--text-3);margin-top:1px"><?= __('analytics_downloads_label', 'descargas') ?></div>
+                  <?php if (!empty($ep['total_time_fmt'])): ?>
+                    <div style="font-size:10.5px;color:var(--text-3);margin-top:1px" title="Tiempo total consumido"><?= e($ep['total_time_fmt']) ?></div>
+                  <?php endif; ?>
                 </div>
               </div>
             <?php endforeach; ?>
@@ -485,11 +496,17 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
                   </div>
                   <div style="font-size:11.5px;color:var(--text-3);margin-top:2px">
                     Show: <strong style="color:var(--text-2)"><?= e($lead['podcast_title']) ?></strong> · S<?= (int)$ep['s'] ?> · E<?= (int)$ep['n'] ?>
+                    <?php if (!empty($ep['avg_playback_fmt']) && $ep['avg_playback_fmt'] !== '—'): ?>
+                      · <span title="Tiempo medio de escucha y retención"><?= e($ep['avg_playback_fmt']) ?> (<?= $ep['completion_pct'] ?>%)</span>
+                    <?php endif; ?>
                   </div>
                 </div>
                 <div class="tabular" style="text-align:right">
                   <div style="font-size:13.5px;font-weight:600"><?= fmt_num((int)$ep['downloads']) ?></div>
                   <div style="font-size:10.5px;color:var(--text-3);margin-top:1px"><?= __('analytics_downloads_label', 'descargas') ?></div>
+                  <?php if (!empty($ep['total_time_fmt'])): ?>
+                    <div style="font-size:10.5px;color:var(--text-3);margin-top:1px" title="Tiempo total consumido"><?= e($ep['total_time_fmt']) ?></div>
+                  <?php endif; ?>
                 </div>
               </div>
             <?php endforeach; ?>

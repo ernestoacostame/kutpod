@@ -26,7 +26,8 @@ $allPodcasts = kp_q("SELECT id, title, slug FROM podcasts WHERE hidden = 0 ORDER
 
       <div class="field" style="margin-bottom:14px">
         <label class="label" style="font-size:12px;font-weight:600;margin-bottom:4px"><?= __('analytics_import_select_podcast', 'Podcast de destino') ?></label>
-        <select class="select" name="podcast_id" id="import-metrics-podcast-id" required style="width:100%">
+        <select class="select" name="podcast_id" id="import-metrics-podcast-id" style="width:100%">
+          <option value="0">✨ Auto-detectar por nombre de podcast en el CSV</option>
           <?php foreach ($allPodcasts as $mp): ?>
             <option value="<?= (int)$mp['id'] ?>"><?= e($mp['title']) ?></option>
           <?php endforeach; ?>

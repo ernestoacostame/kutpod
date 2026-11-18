@@ -138,7 +138,7 @@ $valid_ranges = ['7d'=>7, '30d'=>30, 'mtd'=>(int)date('j'), 'all'=>3650];
 $days = $valid_ranges[$range] ?? 30;
 
 $active_tab = $_GET['tab'] ?? 'downloads';
-if (!in_array($active_tab, ['downloads', 'location', 'tech', 'youtube'], true)) {
+if (!in_array($active_tab, ['downloads', 'performance', 'location', 'tech', 'youtube'], true)) {
   $active_tab = 'downloads';
 }
 
@@ -280,6 +280,10 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
     <button type="button" class="stats-tab-btn <?= $active_tab === 'downloads' ? 'active' : '' ?>" data-tab="downloads" role="tab" aria-selected="<?= $active_tab === 'downloads' ? 'true' : 'false' ?>">
       <?= icon('chart', 16) ?>
       <span><?= __('analytics_tab_downloads', 'Descargas') ?></span>
+    </button>
+    <button type="button" class="stats-tab-btn <?= $active_tab === 'performance' ? 'active' : '' ?>" data-tab="performance" role="tab" aria-selected="<?= $active_tab === 'performance' ? 'true' : 'false' ?>">
+      <?= icon('activity', 16) ?>
+      <span><?= __('analytics_tab_performance', 'Rendimiento') ?></span>
     </button>
     <button type="button" class="stats-tab-btn <?= $active_tab === 'location' ? 'active' : '' ?>" data-tab="location" role="tab" aria-selected="<?= $active_tab === 'location' ? 'true' : 'false' ?>">
       <?= icon('globe', 16) ?>
@@ -602,6 +606,9 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
       <?php endif; ?>
     </div>
   </div>
+
+  <!-- PESTAÑA: RENDIMIENTO COMPARATIVO (EPISODE PERFORMANCE) -->
+  <?php require __DIR__ . '/../includes/views/panel-episode-performance.php'; ?>
 
   <!-- PESTAÑA 2: LOCALIZACIÓN -->
   <div id="panel-location" class="stats-tab-panel <?= $active_tab === 'location' ? 'active' : '' ?>">

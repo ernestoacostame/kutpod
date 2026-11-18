@@ -44,16 +44,6 @@ $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTT
     || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
     || !empty($_POST['ajax']);
 
-if ($podcastId <= 0) {
-    if ($isAjax) {
-        api_error(400, 'invalid_podcast', 'Debes seleccionar un podcast válido');
-    } else {
-        setcookie('kp_flash', 'Error: Debes seleccionar un podcast válido.', time() + 30, '/');
-        header('Location: ' . ($redirect ?: '/admin/analytics'));
-        exit;
-    }
-}
-
 if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
     $errCode = $_FILES['file']['error'] ?? -1;
     $msg = 'Error al subir el archivo CSV (Código: ' . $errCode . ')';

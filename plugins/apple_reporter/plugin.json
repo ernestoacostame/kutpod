@@ -1,0 +1,10 @@
+{
+  "id": "apple_reporter",
+  "name": "Apple Podcasts Reporter",
+  "name_en": "Apple Podcasts Reporter",
+  "version": "1.0.0",
+  "description": "Cliente nativo PHP que conecta automáticamente con la API de Apple Podcasts Reporter para descargar reportes de escucha, suscriptores y rendimiento de forma desatendida.",
+  "description_en": "Native PHP client connecting directly to Apple Podcasts Reporter API to automatically download listening, subscriber, and performance reports.",
+  "author": "KutPod",
+  "main": "apple_reporter.php"
+}

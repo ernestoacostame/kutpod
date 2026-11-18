@@ -3,4 +3,5 @@ storage/*.db
 storage/*.db-wal
 storage/*.db-shm
 /Reporter/
+/*.csv
 

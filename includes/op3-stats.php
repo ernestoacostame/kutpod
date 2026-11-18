@@ -5,6 +5,7 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/op3-importer.php';
+require_once __DIR__ . '/op3-cohorts.php';
 
 function kp_op3_tables_exist(): bool {
   static $exists = null;

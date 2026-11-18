@@ -107,7 +107,8 @@ function kp_op3_detect_platform_from_headers(array $headers): string {
     strpos($joined, 'streams') !== false ||
     strpos($joined, 'median completion') !== false ||
     strpos($joined, 'completion rate') !== false ||
-    strpos($joined, 'spotify uri') !== false
+    strpos($joined, 'spotify uri') !== false ||
+    strpos($joined, 'episode uri') !== false
   ) {
     return 'spotify';
   }
@@ -195,15 +196,6 @@ function kp_op3_read_csv_rows(string $filePath): array {
 function kp_op3_import_external_csv(int $podcastId, string $platformOverride, string $filePath, string $originalFilename = ''): array {
   kp_op3_ensure_schema();
 
-  if ($podcastId <= 0) {
-    throw new InvalidArgumentException('ID de podcast inválido.');
-  }
-
-  $podcast = kp_one("SELECT id, title, slug FROM podcasts WHERE id = ?", [$podcastId]);
-  if (!$podcast) {
-    throw new InvalidArgumentException('El podcast seleccionado no existe.');
-  }
-
   $rows = kp_op3_read_csv_rows($filePath);
   if (empty($rows)) {
     throw new RuntimeException('El archivo CSV está vacío o no tiene un formato válido.');
@@ -216,10 +208,47 @@ function kp_op3_import_external_csv(int $podcastId, string $platformOverride, st
   }
 
   $headers = [];
+  $showNameIdx = null;
   foreach ($rawHeaders as $idx => $h) {
     $clean = mb_strtolower(trim((string)$h), 'UTF-8');
     $clean = str_replace(['"', "'", "\xEF\xBB\xBF"], '', $clean);
     $headers[$idx] = $clean;
+    if ($showNameIdx === null && ($clean === 'show name' || $clean === 'podcast' || $clean === 'podcast name' || $clean === 'show')) {
+      $showNameIdx = $idx;
+    }
+  }
+
+  // Auto-detección de podcast si no fue especificado
+  if ($podcastId <= 0) {
+    if ($showNameIdx !== null && isset($rows[0][$showNameIdx])) {
+      $sName = trim($rows[0][$showNameIdx]);
+      $found = kp_one("SELECT id, title, slug FROM podcasts WHERE LOWER(TRIM(title)) = LOWER(?) LIMIT 1", [$sName]);
+      if ($found) {
+        $podcastId = (int)$found['id'];
+        $podcast = $found;
+      }
+    }
+    if ($podcastId <= 0 && $originalFilename !== '') {
+      $allPods = kp_q("SELECT id, title, slug FROM podcasts") ?: [];
+      foreach ($allPods as $p) {
+        if (!empty($p['slug']) && str_contains(strtolower($originalFilename), strtolower($p['slug']))) {
+          $podcastId = (int)$p['id'];
+          $podcast = $p;
+          break;
+        }
+      }
+    }
+  }
+
+  if ($podcastId <= 0) {
+    throw new InvalidArgumentException('Debes seleccionar un podcast válido para este reporte.');
+  }
+
+  if (!isset($podcast) || !$podcast) {
+    $podcast = kp_one("SELECT id, title, slug FROM podcasts WHERE id = ?", [$podcastId]);
+    if (!$podcast) {
+      throw new InvalidArgumentException('El podcast seleccionado no existe.');
+    }
   }
 
   // Determinar plataforma
@@ -297,9 +326,11 @@ function kp_op3_import_external_csv(int $podcastId, string $platformOverride, st
     // Tiempo total escuchado
     if ($totalTimeIdx === null && (
       $h === 'total time listened' || $h === 'time listened' || $h === 'total time' ||
-      $h === 'tiempo total escuchado' || $h === 'tiempo total' || str_contains($h, 'total time')
+      $h === 'tiempo total escuchado' || $h === 'tiempo total' || str_contains($h, 'total time') ||
+      str_contains($h, 'consumption time')
     )) {
       $totalTimeIdx = $idx;
+      $isTotalHours = str_contains($h, '(hours)');
       continue;
     }
     // Duración
@@ -442,7 +473,16 @@ function kp_op3_import_external_csv(int $podcastId, string $platformOverride, st
     $listeners = ($listenersIdx !== null && isset($row[$listenersIdx])) ? kp_op3_parse_int_val($row[$listenersIdx]) : 0;
     $avgPlaybackSecs = ($avgPlaybackIdx !== null && isset($row[$avgPlaybackIdx])) ? kp_op3_parse_time_to_secs($row[$avgPlaybackIdx]) : 0;
     $completionPct = ($completionIdx !== null && isset($row[$completionIdx])) ? kp_op3_parse_pct_val($row[$completionIdx]) : 0.0;
-    $totalTimeSecs = ($totalTimeIdx !== null && isset($row[$totalTimeIdx])) ? kp_op3_parse_time_to_secs($row[$totalTimeIdx]) : 0;
+    
+    $totalTimeSecs = 0;
+    if ($totalTimeIdx !== null && isset($row[$totalTimeIdx])) {
+      $rawVal = trim((string)$row[$totalTimeIdx]);
+      if (!empty($isTotalHours) && is_numeric(str_replace(',', '.', $rawVal))) {
+        $totalTimeSecs = (int)round((float)str_replace(',', '.', $rawVal) * 3600);
+      } else {
+        $totalTimeSecs = kp_op3_parse_time_to_secs($rawVal);
+      }
+    }
 
     // Relaciones derivadas:
     // Si falta avgPlaybackSecs pero tenemos completionPct y duración:

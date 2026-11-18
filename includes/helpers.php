@@ -104,6 +104,25 @@ function kp_set_lang(string $lang): void {
 
 // Carga única (cacheada por request e idioma) de cadenas de idioma, con fallback a es.
 function kp_lang_strings(): array {
+  static $cache = [];
+  $lang = kp_detect_lang();
+  if (!isset($cache[$lang])) {
+    $file = __DIR__ . "/lang/{$lang}.php";
+    $strings = file_exists($file) ? require $file : [];
+    $fallbackFile = __DIR__ . "/lang/es.php";
+    if ($lang !== 'es' && file_exists($fallbackFile)) {
+      $strings = array_merge(require $fallbackFile, $strings);
+    }
+    $cache[$lang] = is_array($strings) ? $strings : [];
+  }
+  return $cache[$lang];
+}
+
+function __(string $key, $fallback = '', array $replace = []): string {
+  if (is_array($fallback)) {
+    $replace = $fallback;
+    $fallback = '';
+  }
   $strings = kp_lang_strings();
   $text = $strings[$key] ?? ($fallback !== '' ? $fallback : $key);
   if (strpos($text, '|') !== false && isset($replace['count'])) {

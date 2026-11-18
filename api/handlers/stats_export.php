@@ -10,19 +10,27 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/auth.php';
+require_once __DIR__ . '/../../includes/helpers.php';
+require_once __DIR__ . '/../../data.php';
 require_once __DIR__ . '/../../includes/op3-tracker.php';
 require_once __DIR__ . '/../../includes/op3-stats.php';
-require_once __DIR__ . '/../../includes/helpers.php';
 
-// 1. Autenticación (Bearer token o sesión activa de usuario)
-$user = null;
-$auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
-if ($auth_header || (function_exists('getallheaders') && array_key_exists('authorization', array_change_key_case(getallheaders(), CASE_LOWER)))) {
-    $user = api_require_user();
-} else {
-    $user = kp_current_user();
+// 1. Autenticación: primero comprobar la sesión web activa por cookie (navegador)
+$user = kp_current_user();
+if (!$user) {
+    // Si no hay cookie de sesión web, verificar cabecera Authorization (Bearer token)
+    $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    if (!$auth_header && function_exists('getallheaders')) {
+        $headers = array_change_key_case(getallheaders(), CASE_LOWER);
+        $auth_header = $headers['authorization'] ?? '';
+    }
+    if ($auth_header && preg_match('~^Bearer\s+~i', $auth_header)) {
+        try {
+            $user = api_require_user();
+        } catch (Throwable $e) {}
+    }
 }
 
 if (!$user) {
@@ -61,110 +69,133 @@ if ($podParam) {
     }
 }
 
-// Asegurar esquema si es necesario
-kp_op3_ensure_schema();
-
 try {
+    // Asegurar esquema si es necesario
+    kp_op3_ensure_schema();
+
     $podcasts = kp_q("SELECT p.id, p.title, p.slug, p.type FROM podcasts p $podWhere ORDER BY p.title ASC", $podArgs);
-} catch (Throwable $e) {
-    api_error(500, 'database_error', 'Error al consultar podcasts: ' . $e->getMessage());
-}
-
-$filename = 'stats-report-' . ($podParam ? preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)$podParam) . '-' : '') . $range . '.csv';
-
-// 4. Salida del archivo CSV
-header('Content-Type: text/csv; charset=utf-8');
-header('Content-Disposition: attachment; filename="' . $filename . '"');
-
-$out = fopen('php://output', 'w');
-fwrite($out, "\xEF\xBB\xBF"); // BOM para compatibilidad total con Excel / UTF-8
-
-// Encabezados de columnas
-fputcsv($out, [
-    'Tipo de Registro',
-    'Podcast',
-    'Episodio',
-    'Temporada / Episodio',
-    'Fecha / Período',
-    'Descargas',
-    'Oyentes Únicos',
-    'Descargas de Bots',
-    'Duración',
-    'Tiempo Medio de Reproducción',
-    '% Consumo Promedio',
-    'Tiempo Total Escuchado'
-]);
-
-// 5. Generar filas por cada podcast y sus episodios
-foreach ($podcasts as $p) {
-    $podId = (int)$p['id'];
-    $podTitle = $p['title'];
-
-    // Estadísticas agregadas del podcast
-    $podStats = kp_op3_podcast_playback_stats($podId, $days);
-
-    // Fila 1: Resumen General del Podcast
-    fputcsv($out, [
-        'RESUMEN PODCAST',
-        $podTitle,
-        'Todos los episodios (Resumen General)',
-        '—',
-        $period_label,
-        $podStats['downloads'],
-        $podStats['unique_listeners'],
-        $podStats['bot_downloads'],
-        $podStats['avg_duration_fmt'],
-        $podStats['avg_playback_fmt'],
-        $podStats['avg_completion_pct'] . '%',
-        $podStats['total_time_fmt']
-    ]);
-
-    // Episodios particulares de este podcast
-    $episodes = kp_q("
-        SELECT id, title, slug, season, number, duration_secs,
-               COALESCE(published_at, publish_at, created_at) AS date_iso,
-               status
-        FROM episodes
-        WHERE podcast_id = ? AND hidden = 0
-        ORDER BY COALESCE(published_at, publish_at, created_at) DESC
-    ", [$podId]);
-
-    foreach ($episodes as $ep) {
-        $epId = (int)$ep['id'];
-        $epStats = kp_op3_episode_playback_stats($epId, $days);
-
-        $epSeason = (int)($ep['season'] ?? 1);
-        $epNumber = (int)($ep['number'] ?? 0);
-        $epNumStr = '';
-        if ($epSeason > 0 && $epNumber > 0) {
-            $epNumStr = sprintf('T%02d · E%02d', $epSeason, $epNumber);
-        } elseif ($epNumber > 0) {
-            $epNumStr = sprintf('E%02d', $epNumber);
-        } else {
-            $epNumStr = '—';
-        }
-
-        $epDateStr = !empty($ep['date_iso']) ? substr($ep['date_iso'], 0, 10) : '—';
-
-        fputcsv($out, [
-            'Episodio',
-            $podTitle,
-            $ep['title'],
-            $epNumStr,
-            $epDateStr,
-            $epStats['downloads'],
-            $epStats['unique_listeners'],
-            $epStats['bot_downloads'],
-            $epStats['duration_fmt'],
-            $epStats['avg_playback_fmt'],
-            $epStats['completion_pct'] . '%',
-            $epStats['total_time_fmt']
-        ]);
+    if (!$podcasts) {
+        $podcasts = [];
     }
 
-    // Fila vacía entre podcasts para mayor legibilidad
-    fputcsv($out, []);
-}
+    $safeSlug = $podParam ? preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)$podParam) : '';
+    $filename = 'stats-report-' . ($safeSlug ? $safeSlug . '-' : '') . $range . '.csv';
 
-fclose($out);
-exit;
+    // Limpiar cualquier salida previa en el buffer
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+
+    // 4. Salida del archivo CSV
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+
+    $out = fopen('php://output', 'w');
+    if (!$out) {
+        throw new RuntimeException('No se pudo abrir el stream de salida php://output');
+    }
+
+    fwrite($out, "\xEF\xBB\xBF"); // BOM para compatibilidad total con Excel / UTF-8
+
+    // Encabezados de columnas
+    fputcsv($out, [
+        'Tipo de Registro',
+        'Podcast',
+        'Episodio',
+        'Temporada / Episodio',
+        'Fecha / Período',
+        'Descargas',
+        'Oyentes Únicos',
+        'Descargas de Bots',
+        'Duración',
+        'Tiempo Medio de Reproducción',
+        '% Consumo Promedio',
+        'Tiempo Total Escuchado'
+    ]);
+
+    // 5. Generar filas por cada podcast y sus episodios
+    foreach ($podcasts as $p) {
+        $podId = (int)$p['id'];
+        $podTitle = (string)$p['title'];
+
+        // Estadísticas agregadas del podcast
+        $podStats = kp_op3_podcast_playback_stats($podId, $days);
+
+        // Fila 1: Resumen General del Podcast
+        fputcsv($out, [
+            'RESUMEN PODCAST',
+            $podTitle,
+            'Todos los episodios (Resumen General)',
+            '—',
+            $period_label,
+            $podStats['downloads'] ?? 0,
+            $podStats['unique_listeners'] ?? 0,
+            $podStats['bot_downloads'] ?? 0,
+            $podStats['avg_duration_fmt'] ?? '—',
+            $podStats['avg_playback_fmt'] ?? '—',
+            ($podStats['avg_completion_pct'] ?? 0) . '%',
+            $podStats['total_time_fmt'] ?? '0m'
+        ]);
+
+        // Episodios particulares de este podcast
+        $episodes = kp_q("
+            SELECT id, title, slug, season, number, duration_secs,
+                   COALESCE(published_at, publish_at, created_at) AS date_iso,
+                   status
+            FROM episodes
+            WHERE podcast_id = ? AND hidden = 0
+            ORDER BY COALESCE(published_at, publish_at, created_at) DESC
+        ", [$podId]);
+
+        if (is_array($episodes)) {
+            foreach ($episodes as $ep) {
+                $epId = (int)$ep['id'];
+                $epStats = kp_op3_episode_playback_stats($epId, $days);
+
+                $epSeason = (int)($ep['season'] ?? 1);
+                $epNumber = (int)($ep['number'] ?? 0);
+                $epNumStr = '';
+                if ($epSeason > 0 && $epNumber > 0) {
+                    $epNumStr = sprintf('T%02d · E%02d', $epSeason, $epNumber);
+                } elseif ($epNumber > 0) {
+                    $epNumStr = sprintf('E%02d', $epNumber);
+                } else {
+                    $epNumStr = '—';
+                }
+
+                $epDateStr = !empty($ep['date_iso']) ? substr((string)$ep['date_iso'], 0, 10) : '—';
+
+                fputcsv($out, [
+                    'Episodio',
+                    $podTitle,
+                    (string)$ep['title'],
+                    $epNumStr,
+                    $epDateStr,
+                    $epStats['downloads'] ?? 0,
+                    $epStats['unique_listeners'] ?? 0,
+                    $epStats['bot_downloads'] ?? 0,
+                    $epStats['duration_fmt'] ?? '—',
+                    $epStats['avg_playback_fmt'] ?? '—',
+                    ($epStats['completion_pct'] ?? 0) . '%',
+                    $epStats['total_time_fmt'] ?? '0m'
+                ]);
+            }
+        }
+
+        // Fila vacía entre podcasts para mayor legibilidad
+        fputcsv($out, []);
+    }
+
+    fclose($out);
+    exit;
+
+} catch (Throwable $e) {
+    error_log('[stats_export error] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    api_error(500, 'export_error', 'Error generando el archivo CSV: ' . $e->getMessage());
+}

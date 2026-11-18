@@ -9,6 +9,30 @@ function admin_url(string $p = ''): string {
   return '/admin' . ($p ? '/' . $p : '');
 }
 
+if (!function_exists('kp_fmt_duration')) {
+  function kp_fmt_duration(int $s): string {
+    if ($s <= 0) return '—';
+    $h = intdiv($s, 3600); $m = intdiv($s % 3600, 60); $sec = $s % 60;
+    return $h > 0 ? sprintf('%d:%02d:%02d', $h, $m, $sec) : sprintf('%d:%02d', $m, $sec);
+  }
+}
+
+if (!function_exists('kp_fmt_relative_date')) {
+  function kp_fmt_relative_date(string $iso): string {
+    if (!$iso) return '—';
+    if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/', $iso)) {
+      $iso .= ' UTC';
+    }
+    $ts = strtotime($iso); if (!$ts) return '—';
+    $diff = max(0, time() - $ts);
+    if ($diff < 60)         return 'ahora';
+    if ($diff < 3600)       return intdiv($diff, 60) . ' min';
+    if ($diff < 86400)      return intdiv($diff, 3600) . ' h';
+    if ($diff < 7*86400)    return intdiv($diff, 86400) . ' d';
+    return date('M j', $ts);
+  }
+}
+
 // ============================================================================
 // i18n · Detección y traducción
 // ============================================================================

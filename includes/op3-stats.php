@@ -3,6 +3,7 @@
 // KutPod · helpers de analytics OP3 · solo datos reales (sin mocks)
 // ============================================================================
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/helpers.php';
 
 function kp_op3_tables_exist(): bool {
   static $exists = null;

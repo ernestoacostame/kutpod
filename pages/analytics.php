@@ -242,6 +242,7 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
       <?= rng_btn('mtd', __('analytics_range_mtd', 'Este mes'), $range, $active_tab) ?>
       <?= rng_btn('all', __('analytics_range_all', 'Histórico'), $range, $active_tab) ?>
     </div>
+    <button type="button" class="btn" onclick="openImportMetricsModal()"><?= icon('upload',13) ?> <?= __('analytics_import_csv', 'Importar métricas') ?></button>
     <a class="btn" href="/api/v1/stats/export.csv?range=<?= e($range) ?>"><?= icon('download',13) ?> <?= __('analytics_export_csv', 'Exportar CSV') ?></a>
   </div>
 </div>
@@ -513,6 +514,92 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
           </div>
         <?php endif; ?>
       </div>
+    </div>
+
+    <!-- Sección de retención y métricas de plataformas externas (Apple Podcasts & Spotify) -->
+    <?php
+      $recentExtStats = [];
+      try {
+        $recentExtStats = kp_q("
+          SELECT s.id, s.platform, s.plays, s.listeners, s.avg_playback_secs, s.completion_pct, s.total_time_secs, s.imported_at,
+                 e.id as ep_id, e.title as ep_title, e.duration_secs,
+                 p.id as pod_id, p.title as pod_title
+          FROM external_platform_stats s
+          JOIN episodes e ON e.id = s.episode_id
+          JOIN podcasts p ON p.id = s.podcast_id
+          ORDER BY s.imported_at DESC, s.id DESC
+          LIMIT 10
+        ") ?: [];
+      } catch (Throwable $e) {}
+    ?>
+    <div class="card card-lg" style="margin-top:24px">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="card-title" style="display:flex;align-items:center;gap:8px">
+            <?= icon('headphones', 18) ?> <?= __('analytics_retention_card_title', 'Retención y consumo por plataforma externa') ?>
+          </div>
+          <div class="page-sub" style="margin-top:4px;font-size:12.5px">
+            <?= __('analytics_retention_card_desc', 'Métricas importadas de Apple Podcasts Connect y Spotify for Creators vinculadas a tus episodios y consolidadas con OP3.') ?>
+          </div>
+        </div>
+        <button type="button" class="btn" style="font-size:12.5px" onclick="openImportMetricsModal()">
+          <?= icon('upload', 13) ?> <?= __('analytics_import_csv', 'Importar métricas') ?>
+        </button>
+      </div>
+
+      <?php if (empty($recentExtStats)): ?>
+        <div style="text-align:center;padding:28px 16px;background:var(--surface-2);border-radius:10px;border:1px dashed var(--border)">
+          <div style="font-size:13.5px;font-weight:500;margin-bottom:6px"><?= __('analytics_no_ext_stats_title', 'Aún no has importado archivos CSV externos') ?></div>
+          <p class="muted" style="font-size:12px;margin:0 0 14px 0;max-width:480px;margin-inline:auto">
+            <?= __('analytics_no_ext_stats_desc', 'Puedes exportar el reporte de episodios desde Apple Podcasts Connect o Spotify for Creators y subirlo aquí para incorporar la retención y tiempo consumido.') ?>
+          </p>
+          <button type="button" class="btn btn-primary" style="font-size:12px" onclick="openImportMetricsModal()">
+            <?= icon('upload', 13) ?> <?= __('analytics_import_csv_action', 'Subir CSV de Apple o Spotify') ?>
+          </button>
+        </div>
+      <?php else: ?>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);color:var(--text-3);text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:0.06em">
+                <th style="padding:8px 6px"><?= __('ep_col_title', 'Episodio') ?></th>
+                <th style="padding:8px 6px"><?= __('ep_col_show', 'Podcast') ?></th>
+                <th style="padding:8px 6px"><?= __('platform', 'Plataforma') ?></th>
+                <th style="padding:8px 6px;text-align:right"><?= __('plays', 'Reproducciones') ?></th>
+                <th style="padding:8px 6px;text-align:right"><?= __('ep_col_avg_playback', 'Tiempo promedio') ?></th>
+                <th style="padding:8px 6px;text-align:right"><?= __('analytics_retention_col', 'Retención') ?></th>
+                <th style="padding:8px 6px;text-align:right"><?= __('analytics_imported_col', 'Importado') ?></th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($recentExtStats as $res):
+                $pBadge = ($res['platform'] === 'apple')
+                  ? '<span style="background:rgba(255,255,255,0.08);color:var(--text-1);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600"> Apple</span>'
+                  : (($res['platform'] === 'spotify')
+                    ? '<span style="background:rgba(34,197,94,0.15);color:#22c55e;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">Spotify</span>'
+                    : '<span style="background:var(--border);color:var(--text-2);padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">CSV</span>');
+                $avgFmt = $res['avg_playback_secs'] > 0 ? kp_fmt_duration((int)$res['avg_playback_secs']) : '—';
+                $pctFmt = $res['completion_pct'] > 0 ? ($res['completion_pct'] . '%') : '—';
+                $dateFmt = !empty($res['imported_at']) ? substr($res['imported_at'], 0, 10) : '—';
+              ?>
+                <tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:10px 6px;font-weight:500">
+                    <a href="/admin/new-episode?id=<?= urlencode((string)$res['ep_id']) ?>" style="color:inherit;text-decoration:none" onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+                      <?= e($res['ep_title']) ?>
+                    </a>
+                  </td>
+                  <td style="padding:10px 6px;color:var(--text-2)"><?= e($res['pod_title']) ?></td>
+                  <td style="padding:10px 6px"><?= $pBadge ?></td>
+                  <td class="tabular" style="padding:10px 6px;text-align:right"><?= number_format((int)$res['plays']) ?></td>
+                  <td class="tabular" style="padding:10px 6px;text-align:right"><?= e($avgFmt) ?></td>
+                  <td class="tabular" style="padding:10px 6px;text-align:right;font-weight:600;color:var(--accent)"><?= e($pctFmt) ?></td>
+                  <td class="tabular" style="padding:10px 6px;text-align:right;color:var(--text-3);font-size:11px"><?= e($dateFmt) ?></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      <?php endif; ?>
     </div>
   </div>
 
@@ -1386,3 +1473,5 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
   </script>
 
 <?php endif; ?>
+
+<?php require_once __DIR__ . '/../includes/views/modal-import-metrics.php'; ?>

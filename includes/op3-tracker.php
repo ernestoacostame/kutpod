@@ -109,6 +109,25 @@ function kp_op3_ensure_schema(): void {
     PRIMARY KEY (date, episode_id)
   )");
   $pdo->exec("CREATE INDEX IF NOT EXISTS idx_playback_pod ON op3_playback_daily(podcast_id, date)");
+
+  // Métricas importadas de plataformas externas (Apple Podcasts, Spotify, etc.)
+  $pdo->exec("CREATE TABLE IF NOT EXISTS external_platform_stats (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    podcast_id        INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
+    episode_id        INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+    platform          TEXT NOT NULL,
+    source_file       TEXT,
+    plays             INTEGER NOT NULL DEFAULT 0,
+    listeners         INTEGER NOT NULL DEFAULT 0,
+    avg_playback_secs INTEGER NOT NULL DEFAULT 0,
+    completion_pct    REAL NOT NULL DEFAULT 0.0,
+    total_time_secs   INTEGER NOT NULL DEFAULT 0,
+    raw_data          TEXT,
+    imported_at       TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(episode_id, platform)
+  )");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_ext_stats_ep ON external_platform_stats(episode_id, platform)");
+  $pdo->exec("CREATE INDEX IF NOT EXISTS idx_ext_stats_pod ON external_platform_stats(podcast_id, platform)");
 }
 
 /**

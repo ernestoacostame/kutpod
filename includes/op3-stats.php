@@ -4,6 +4,7 @@
 // ============================================================================
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/op3-importer.php';
 
 function kp_op3_tables_exist(): bool {
   static $exists = null;
@@ -247,18 +248,26 @@ function kp_fmt_hours_mins(int $secs): string {
  */
 function kp_op3_episode_playback_stats(int $episodeId, int $days = 30): array {
   $zero = [
-    'duration_secs'     => 0,
-    'duration_fmt'      => '—',
-    'downloads'         => 0,
-    'unique_listeners'  => 0,
-    'bot_downloads'     => 0,
-    'plays'             => 0,
-    'completed'         => 0,
-    'avg_playback_secs' => 0,
-    'avg_playback_fmt'  => '—',
-    'completion_pct'    => 0.0,
-    'total_time_secs'   => 0,
-    'total_time_fmt'    => '0m'
+    'duration_secs'          => 0,
+    'duration_fmt'           => '—',
+    'downloads'              => 0,
+    'unique_listeners'       => 0,
+    'bot_downloads'          => 0,
+    'plays'                  => 0,
+    'completed'              => 0,
+    'avg_playback_secs'      => 0,
+    'avg_playback_fmt'       => '—',
+    'completion_pct'         => 0.0,
+    'total_time_secs'        => 0,
+    'total_time_fmt'         => '—',
+    'apple_completion_pct'   => null,
+    'apple_avg_secs'         => null,
+    'apple_plays'            => null,
+    'spotify_completion_pct' => null,
+    'spotify_avg_secs'       => null,
+    'spotify_plays'          => null,
+    'has_external_stats'     => false,
+    'external_stats'         => []
   ];
   if ($episodeId <= 0) return $zero;
 
@@ -299,34 +308,117 @@ function kp_op3_episode_playback_stats(int $episodeId, int $days = 30): array {
     }
   } catch (Throwable $e) {}
 
-  // Cálculo de retención media y tiempo promedio de escucha basado en telemetría real
+  // Métricas de plataformas externas importadas (Apple Podcasts, Spotify, etc.)
+  $appleStats = null;
+  $spotifyStats = null;
+  $extRows = [];
+  try {
+    $extRows = kp_q("
+      SELECT platform, plays, listeners, avg_playback_secs, completion_pct, total_time_secs, imported_at
+      FROM external_platform_stats
+      WHERE episode_id = ?
+    ", [$episodeId]);
+    if ($extRows) {
+      foreach ($extRows as $er) {
+        if ($er['platform'] === 'apple')   $appleStats = $er;
+        if ($er['platform'] === 'spotify') $spotifyStats = $er;
+      }
+    }
+  } catch (Throwable $e) {}
+
+  // Fuentes con retención medida
+  $sources = [];
+
+  // 1. Telemetría web local
   if ($plays > 0 && $dur > 0 && $webSecs > 0) {
-    $avgSecsPerPlay = (int)round($webSecs / $plays);
-    $retentionRate = min(1.0, max(0.05, $avgSecsPerPlay / $dur));
-    $avgPlaybackSecs = (int)round($dur * $retentionRate);
-    $completionPct = round($retentionRate * 100, 1);
-    $audienceCount = max($dl, $plays);
-    $totalTimeSecs = (int)round($audienceCount * $avgPlaybackSecs);
+    $webAvg = (int)round($webSecs / $plays);
+    $webRate = min(1.0, max(0.05, $webAvg / $dur));
+    $sources[] = [
+      'weight'     => max(1, $plays),
+      'pct'        => round($webRate * 100, 1),
+      'secs'       => (int)round($dur * $webRate),
+      'total_time' => $webSecs
+    ];
+  }
+
+  // 2. Apple Podcasts Connect
+  if ($appleStats && ($appleStats['completion_pct'] > 0 || $appleStats['avg_playback_secs'] > 0)) {
+    $aPct = (float)$appleStats['completion_pct'];
+    $aSecs = (int)$appleStats['avg_playback_secs'];
+    if ($aSecs <= 0 && $aPct > 0 && $dur > 0) {
+      $aSecs = (int)round(($aPct / 100) * $dur);
+    } elseif ($aPct <= 0 && $aSecs > 0 && $dur > 0) {
+      $aPct = round(($aSecs / $dur) * 100, 1);
+    }
+    $sources[] = [
+      'weight'     => max(1, (int)$appleStats['listeners'] ?: (int)$appleStats['plays']),
+      'pct'        => $aPct,
+      'secs'       => $aSecs,
+      'total_time' => (int)$appleStats['total_time_secs']
+    ];
+  }
+
+  // 3. Spotify for Creators
+  if ($spotifyStats && ($spotifyStats['completion_pct'] > 0 || $spotifyStats['avg_playback_secs'] > 0)) {
+    $sPct = (float)$spotifyStats['completion_pct'];
+    $sSecs = (int)$spotifyStats['avg_playback_secs'];
+    if ($sSecs <= 0 && $sPct > 0 && $dur > 0) {
+      $sSecs = (int)round(($sPct / 100) * $dur);
+    } elseif ($sPct <= 0 && $sSecs > 0 && $dur > 0) {
+      $sPct = round(($sSecs / $dur) * 100, 1);
+    }
+    $sources[] = [
+      'weight'     => max(1, (int)$spotifyStats['listeners'] ?: (int)$spotifyStats['plays']),
+      'pct'        => $sPct,
+      'secs'       => $sSecs,
+      'total_time' => (int)$spotifyStats['total_time_secs']
+    ];
+  }
+
+  // Cálculo consolidado de retención y tiempo total consumido
+  if (!empty($sources)) {
+    $sumWeight = 0;
+    $weightedPct = 0;
+    $weightedSecs = 0;
+    $sumTotalTime = 0;
+    foreach ($sources as $s) {
+      $w = max(1, $s['weight']);
+      $sumWeight += $w;
+      $weightedPct += ($s['pct'] * $w);
+      $weightedSecs += ($s['secs'] * $w);
+      $sumTotalTime += $s['total_time'];
+    }
+    $completionPct = round($weightedPct / max(1, $sumWeight), 1);
+    $avgPlaybackSecs = (int)round($weightedSecs / max(1, $sumWeight));
+    $audienceCount = max($dl, $sumWeight);
+    $totalTimeSecs = $audienceCount > 0 ? (int)round($audienceCount * $avgPlaybackSecs) : $sumTotalTime;
   } else {
-    $retentionRate = 0;
-    $avgPlaybackSecs = 0;
     $completionPct = 0.0;
+    $avgPlaybackSecs = 0;
     $totalTimeSecs = 0;
   }
 
   return [
-    'duration_secs'     => $dur,
-    'duration_fmt'      => kp_fmt_duration($dur),
-    'downloads'         => $dl,
-    'unique_listeners'  => $ul,
-    'bot_downloads'     => $bd,
-    'plays'             => $plays,
-    'completed'         => $completed,
-    'avg_playback_secs' => $avgPlaybackSecs,
-    'avg_playback_fmt'  => $avgPlaybackSecs > 0 ? kp_fmt_duration($avgPlaybackSecs) : '—',
-    'completion_pct'    => $completionPct,
-    'total_time_secs'   => $totalTimeSecs,
-    'total_time_fmt'    => $totalTimeSecs > 0 ? kp_fmt_hours_mins($totalTimeSecs) : '—'
+    'duration_secs'          => $dur,
+    'duration_fmt'           => kp_fmt_duration($dur),
+    'downloads'              => $dl,
+    'unique_listeners'       => $ul,
+    'bot_downloads'          => $bd,
+    'plays'                  => $plays,
+    'completed'              => $completed,
+    'avg_playback_secs'      => $avgPlaybackSecs,
+    'avg_playback_fmt'       => $avgPlaybackSecs > 0 ? kp_fmt_duration($avgPlaybackSecs) : '—',
+    'completion_pct'         => $completionPct,
+    'total_time_secs'        => $totalTimeSecs,
+    'total_time_fmt'         => $totalTimeSecs > 0 ? kp_fmt_hours_mins($totalTimeSecs) : '—',
+    'apple_completion_pct'   => $appleStats ? (float)$appleStats['completion_pct'] : null,
+    'apple_avg_secs'         => $appleStats ? (int)$appleStats['avg_playback_secs'] : null,
+    'apple_plays'            => $appleStats ? (int)$appleStats['plays'] : null,
+    'spotify_completion_pct' => $spotifyStats ? (float)$spotifyStats['completion_pct'] : null,
+    'spotify_avg_secs'       => $spotifyStats ? (int)$spotifyStats['avg_playback_secs'] : null,
+    'spotify_plays'          => $spotifyStats ? (int)$spotifyStats['plays'] : null,
+    'has_external_stats'     => (!empty($appleStats) || !empty($spotifyStats)),
+    'external_stats'         => $extRows
   ];
 }
 
@@ -335,18 +427,20 @@ function kp_op3_episode_playback_stats(int $episodeId, int $days = 30): array {
  */
 function kp_op3_podcast_playback_stats(int $podcastId, int $days = 30): array {
   $zero = [
-    'podcast_id'         => $podcastId,
-    'downloads'          => 0,
-    'unique_listeners'   => 0,
-    'bot_downloads'      => 0,
-    'episodes_count'     => 0,
-    'avg_duration_secs'  => 0,
-    'avg_duration_fmt'   => '—',
-    'avg_playback_secs'  => 0,
-    'avg_playback_fmt'   => '—',
-    'avg_completion_pct' => 0.0,
-    'total_time_secs'    => 0,
-    'total_time_fmt'     => '0m'
+    'podcast_id'                 => $podcastId,
+    'downloads'                  => 0,
+    'unique_listeners'           => 0,
+    'bot_downloads'              => 0,
+    'episodes_count'             => 0,
+    'avg_duration_secs'          => 0,
+    'avg_duration_fmt'           => '—',
+    'avg_playback_secs'          => 0,
+    'avg_playback_fmt'           => '—',
+    'avg_completion_pct'         => 0.0,
+    'apple_avg_completion_pct'   => 0.0,
+    'spotify_avg_completion_pct' => 0.0,
+    'total_time_secs'            => 0,
+    'total_time_fmt'             => '—'
   ];
   if ($podcastId <= 0) return $zero;
 
@@ -363,6 +457,8 @@ function kp_op3_podcast_playback_stats(int $podcastId, int $days = 30): array {
   $totalSecsAccum = 0;
   $weightedPlaybackSum = 0;
   $weightedPctSum = 0;
+  $appleWeightedPctSum = 0; $appleWeightSum = 0;
+  $spotifyWeightedPctSum = 0; $spotifyWeightSum = 0;
 
   foreach ($eps as $ep) {
     $epStat = kp_op3_episode_playback_stats((int)$ep['id'], $days);
@@ -376,9 +472,23 @@ function kp_op3_podcast_playback_stats(int $podcastId, int $days = 30): array {
       $validDurCount++;
     }
 
-    $weight = max(1, $epStat['downloads']);
-    $weightedPlaybackSum += ($epStat['avg_playback_secs'] * $weight);
-    $weightedPctSum += ($epStat['completion_pct'] * $weight);
+    if ($epStat['avg_playback_secs'] > 0) {
+      $weight = max(1, $epStat['downloads']);
+      $weightedPlaybackSum += ($epStat['avg_playback_secs'] * $weight);
+      $weightedPctSum += ($epStat['completion_pct'] * $weight);
+    }
+
+    if (isset($epStat['apple_completion_pct']) && $epStat['apple_completion_pct'] > 0) {
+      $aWeight = max(1, (int)($epStat['apple_plays'] ?? $epStat['downloads']));
+      $appleWeightedPctSum += ($epStat['apple_completion_pct'] * $aWeight);
+      $appleWeightSum += $aWeight;
+    }
+
+    if (isset($epStat['spotify_completion_pct']) && $epStat['spotify_completion_pct'] > 0) {
+      $sWeight = max(1, (int)($epStat['spotify_plays'] ?? $epStat['downloads']));
+      $spotifyWeightedPctSum += ($epStat['spotify_completion_pct'] * $sWeight);
+      $spotifyWeightSum += $sWeight;
+    }
   }
 
   $epCount = count($eps);
@@ -386,20 +496,24 @@ function kp_op3_podcast_playback_stats(int $podcastId, int $days = 30): array {
   $hasMeasuredPlays = ($totalSecsAccum > 0 && $weightedPlaybackSum > 0);
   $avgPlaybackSecs = $hasMeasuredPlays ? (int)round($weightedPlaybackSum / max(1, $totalDl)) : 0;
   $avgCompletionPct = $hasMeasuredPlays ? round($weightedPctSum / max(1, $totalDl), 1) : 0.0;
+  $appleAvgCompletionPct = $appleWeightSum > 0 ? round($appleWeightedPctSum / $appleWeightSum, 1) : 0.0;
+  $spotifyAvgCompletionPct = $spotifyWeightSum > 0 ? round($spotifyWeightedPctSum / $spotifyWeightSum, 1) : 0.0;
 
   return [
-    'podcast_id'         => $podcastId,
-    'downloads'          => $totalDl,
-    'unique_listeners'   => $totalUl,
-    'bot_downloads'      => $totalBd,
-    'episodes_count'     => $epCount,
-    'avg_duration_secs'  => $avgDurationSecs,
-    'avg_duration_fmt'   => $avgDurationSecs > 0 ? kp_fmt_duration($avgDurationSecs) : '—',
-    'avg_playback_secs'  => $avgPlaybackSecs,
-    'avg_playback_fmt'   => $avgPlaybackSecs > 0 ? kp_fmt_duration($avgPlaybackSecs) : '—',
-    'avg_completion_pct' => $avgCompletionPct,
-    'total_time_secs'    => $totalSecsAccum,
-    'total_time_fmt'     => $totalSecsAccum > 0 ? kp_fmt_hours_mins($totalSecsAccum) : '—'
+    'podcast_id'                 => $podcastId,
+    'downloads'                  => $totalDl,
+    'unique_listeners'           => $totalUl,
+    'bot_downloads'              => $totalBd,
+    'episodes_count'             => $epCount,
+    'avg_duration_secs'          => $avgDurationSecs,
+    'avg_duration_fmt'           => $avgDurationSecs > 0 ? kp_fmt_duration($avgDurationSecs) : '—',
+    'avg_playback_secs'          => $avgPlaybackSecs,
+    'avg_playback_fmt'           => $avgPlaybackSecs > 0 ? kp_fmt_duration($avgPlaybackSecs) : '—',
+    'avg_completion_pct'         => $avgCompletionPct,
+    'apple_avg_completion_pct'   => $appleAvgCompletionPct,
+    'spotify_avg_completion_pct' => $spotifyAvgCompletionPct,
+    'total_time_secs'            => $totalSecsAccum,
+    'total_time_fmt'             => $totalSecsAccum > 0 ? kp_fmt_hours_mins($totalSecsAccum) : '—'
   ];
 }
 
@@ -410,14 +524,16 @@ function kp_op3_all_podcasts_playback_totals(int $days = 30): array {
   $podcasts = kp_q("SELECT id, title FROM podcasts WHERE hidden = 0");
   if (!$podcasts) {
     return [
-      'downloads'          => 0,
-      'unique_listeners'   => 0,
-      'bot_downloads'      => 0,
-      'avg_playback_secs'  => 0,
-      'avg_playback_fmt'   => '—',
-      'avg_completion_pct' => 0.0,
-      'total_time_secs'    => 0,
-      'total_time_fmt'     => '—'
+      'downloads'                  => 0,
+      'unique_listeners'           => 0,
+      'bot_downloads'              => 0,
+      'avg_playback_secs'          => 0,
+      'avg_playback_fmt'           => '—',
+      'avg_completion_pct'         => 0.0,
+      'apple_avg_completion_pct'   => 0.0,
+      'spotify_avg_completion_pct' => 0.0,
+      'total_time_secs'            => 0,
+      'total_time_fmt'             => '—'
     ];
   }
 
@@ -425,6 +541,8 @@ function kp_op3_all_podcasts_playback_totals(int $days = 30): array {
   $totalTimeSecs = 0;
   $weightedPlaybackSum = 0;
   $weightedPctSum = 0;
+  $appleWeightedSum = 0; $appleWeightSum = 0;
+  $spotifyWeightedSum = 0; $spotifyWeightSum = 0;
 
   foreach ($podcasts as $p) {
     $ps = kp_op3_podcast_playback_stats((int)$p['id'], $days);
@@ -438,21 +556,37 @@ function kp_op3_all_podcasts_playback_totals(int $days = 30): array {
       $weightedPlaybackSum += ($ps['avg_playback_secs'] * $weight);
       $weightedPctSum += ($ps['avg_completion_pct'] * $weight);
     }
+
+    if ($ps['apple_avg_completion_pct'] > 0) {
+      $w = max(1, $ps['downloads']);
+      $appleWeightedSum += ($ps['apple_avg_completion_pct'] * $w);
+      $appleWeightSum += $w;
+    }
+
+    if ($ps['spotify_avg_completion_pct'] > 0) {
+      $w = max(1, $ps['downloads']);
+      $spotifyWeightedSum += ($ps['spotify_avg_completion_pct'] * $w);
+      $spotifyWeightSum += $w;
+    }
   }
 
   $hasMeasuredPlays = ($totalTimeSecs > 0 && $weightedPlaybackSum > 0);
   $avgPlaybackSecs = $hasMeasuredPlays ? (int)round($weightedPlaybackSum / max(1, $totalDl)) : 0;
   $avgCompletionPct = $hasMeasuredPlays ? round($weightedPctSum / max(1, $totalDl), 1) : 0.0;
+  $appleAvgCompletionPct = $appleWeightSum > 0 ? round($appleWeightedSum / $appleWeightSum, 1) : 0.0;
+  $spotifyAvgCompletionPct = $spotifyWeightSum > 0 ? round($spotifyWeightedSum / $spotifyWeightSum, 1) : 0.0;
 
   return [
-    'downloads'          => $totalDl,
-    'unique_listeners'   => $totalUl,
-    'bot_downloads'      => $totalBd,
-    'avg_playback_secs'  => $avgPlaybackSecs,
-    'avg_playback_fmt'   => $avgPlaybackSecs > 0 ? kp_fmt_duration($avgPlaybackSecs) : '—',
-    'avg_completion_pct' => $avgCompletionPct,
-    'total_time_secs'    => $totalTimeSecs,
-    'total_time_fmt'     => $totalTimeSecs > 0 ? kp_fmt_hours_mins($totalTimeSecs) : '—'
+    'downloads'                  => $totalDl,
+    'unique_listeners'           => $totalUl,
+    'bot_downloads'              => $totalBd,
+    'avg_playback_secs'          => $avgPlaybackSecs,
+    'avg_playback_fmt'           => $avgPlaybackSecs > 0 ? kp_fmt_duration($avgPlaybackSecs) : '—',
+    'avg_completion_pct'         => $avgCompletionPct,
+    'apple_avg_completion_pct'   => $appleAvgCompletionPct,
+    'spotify_avg_completion_pct' => $spotifyAvgCompletionPct,
+    'total_time_secs'            => $totalTimeSecs,
+    'total_time_fmt'             => $totalTimeSecs > 0 ? kp_fmt_hours_mins($totalTimeSecs) : '—'
   ];
 }
 

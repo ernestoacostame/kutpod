@@ -400,7 +400,15 @@ function ep_row(array $ep, bool $podcastView = false): string {
   if (!empty($ep['duration']) && $ep['duration'] !== '—' && !empty($ep['db_id']) && function_exists('kp_op3_episode_playback_stats')) {
     $epPb = kp_op3_episode_playback_stats((int)$ep['db_id'], 30);
     if (!empty($epPb['avg_playback_fmt']) && $epPb['avg_playback_fmt'] !== '—') {
-      $avgPlaybackSub = '<div style="font-size:10.5px;color:var(--text-3);margin-top:2px" title="' . e(__('ep_col_avg_playback', 'Tiempo promedio de reproducción')) . '">Avg: ' . e($epPb['avg_playback_fmt']) . ' (' . $epPb['completion_pct'] . '%)</div>';
+      $badges = [];
+      if (isset($epPb['apple_completion_pct']) && $epPb['apple_completion_pct'] > 0) {
+        $badges[] = ' ' . $epPb['apple_completion_pct'] . '%';
+      }
+      if (isset($epPb['spotify_completion_pct']) && $epPb['spotify_completion_pct'] > 0) {
+        $badges[] = 'Spotify ' . $epPb['spotify_completion_pct'] . '%';
+      }
+      $badgeStr = !empty($badges) ? ' <span style="opacity:0.85;font-weight:400">(' . implode(' · ', $badges) . ')</span>' : '';
+      $avgPlaybackSub = '<div style="font-size:10.5px;color:var(--text-3);margin-top:2px" title="' . e(__('ep_col_avg_playback', 'Tiempo promedio de reproducción')) . '">Avg: ' . e($epPb['avg_playback_fmt']) . ' (' . $epPb['completion_pct'] . '%)' . $badgeStr . '</div>';
     }
   }
 

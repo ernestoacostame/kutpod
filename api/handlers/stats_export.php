@@ -107,12 +107,14 @@ try {
         'Episodio',
         'Temporada / Episodio',
         'Fecha / Período',
-        'Descargas',
-        'Oyentes Únicos',
+        'Descargas (OP3)',
+        'Oyentes Únicos (OP3)',
         'Descargas de Bots',
         'Duración',
         'Tiempo Medio de Reproducción',
-        '% Consumo Promedio',
+        '% Consumo Consolidado',
+        '% Retención Apple',
+        '% Retención Spotify',
         'Tiempo Total Escuchado'
     ]);
 
@@ -137,6 +139,8 @@ try {
             $podStats['avg_duration_fmt'] ?? '—',
             $podStats['avg_playback_fmt'] ?? '—',
             ($podStats['avg_completion_pct'] ?? 0) > 0 ? ($podStats['avg_completion_pct'] . '%') : '—',
+            ($podStats['apple_avg_completion_pct'] ?? 0) > 0 ? ($podStats['apple_avg_completion_pct'] . '%') : '—',
+            ($podStats['spotify_avg_completion_pct'] ?? 0) > 0 ? ($podStats['spotify_avg_completion_pct'] . '%') : '—',
             $podStats['total_time_fmt'] ?? '—'
         ]);
 
@@ -180,6 +184,8 @@ try {
                     $epStats['duration_fmt'] ?? '—',
                     $epStats['avg_playback_fmt'] ?? '—',
                     ($epStats['completion_pct'] ?? 0) > 0 ? ($epStats['completion_pct'] . '%') : '—',
+                    isset($epStats['apple_completion_pct']) && $epStats['apple_completion_pct'] > 0 ? ($epStats['apple_completion_pct'] . '%') : '—',
+                    isset($epStats['spotify_completion_pct']) && $epStats['spotify_completion_pct'] > 0 ? ($epStats['spotify_completion_pct'] . '%') : '—',
                     $epStats['total_time_fmt'] ?? '—'
                 ]);
             }

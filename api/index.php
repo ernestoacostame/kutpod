@@ -106,6 +106,12 @@ if (($route === 'v1/stats/export.csv' || $route === 'stats/export.csv') && $meth
     exit;
 }
 
+// Match: v1/stats/import (y stats/import)
+if (($route === 'v1/stats/import' || $route === 'stats/import') && $method === 'POST') {
+    require __DIR__ . '/handlers/stats_import.php';
+    exit;
+}
+
 // Match: update (check, apply, rollback — solo sesión admin, no API tokens)
 if ($route === 'update') {
     require __DIR__ . '/handlers/update.php';

@@ -192,6 +192,23 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   created_at    INTEGER NOT NULL
 );
 
+-- Métricas importadas de plataformas externas (Apple Podcasts, Spotify, etc.)
+CREATE TABLE IF NOT EXISTS external_platform_stats (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  podcast_id        INTEGER NOT NULL REFERENCES podcasts(id) ON DELETE CASCADE,
+  episode_id        INTEGER NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+  platform          TEXT NOT NULL,
+  source_file       TEXT,
+  plays             INTEGER NOT NULL DEFAULT 0,
+  listeners         INTEGER NOT NULL DEFAULT 0,
+  avg_playback_secs INTEGER NOT NULL DEFAULT 0,
+  completion_pct    REAL NOT NULL DEFAULT 0.0,
+  total_time_secs   INTEGER NOT NULL DEFAULT 0,
+  raw_data          TEXT,
+  imported_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(episode_id, platform)
+);
+
 -- Índices de alto rendimiento
 CREATE INDEX IF NOT EXISTS idx_episodes_podcast ON episodes(podcast_id);
 CREATE INDEX IF NOT EXISTS idx_episodes_slug ON episodes(slug);
@@ -202,4 +219,6 @@ CREATE INDEX IF NOT EXISTS idx_stats_daily_ep ON op3_stats_daily(episode_id, dow
 CREATE INDEX IF NOT EXISTS idx_stats_daily_pod ON op3_stats_daily(podcast_id, date);
 CREATE INDEX IF NOT EXISTS idx_geo_daily_ep ON op3_geo_daily(episode_id, date);
 CREATE INDEX IF NOT EXISTS idx_apps_daily_ep ON op3_apps_daily(episode_id, date);
+CREATE INDEX IF NOT EXISTS idx_ext_stats_ep ON external_platform_stats(episode_id, platform);
+CREATE INDEX IF NOT EXISTS idx_ext_stats_pod ON external_platform_stats(podcast_id, platform);
 

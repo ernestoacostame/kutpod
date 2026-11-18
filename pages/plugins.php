@@ -280,7 +280,7 @@ if ($action === 'settings' && $pluginId !== '') {
       
       <?php if (empty($available_plugins)): ?>
         <div style="text-align:center; padding:48px 0; color:var(--text-3)">
-          <?= icon('layers', 32) ?>
+          <?= icon('puzzle', 32) ?>
           <p style="margin-top:12px; font-size:14px"><?= __('plug_no_plugins', 'No hay plugins instalados.') ?></p>
         </div>
       <?php else: ?>
@@ -290,7 +290,7 @@ if ($action === 'settings' && $pluginId !== '') {
           ?>
             <div class="plugin-item-row" style="display:flex; align-items:flex-start; gap:16px; padding:18px; border:1px solid var(--border); border-radius:12px; background:var(--surface-2)">
               <div style="width:40px; height:40px; border-radius:8px; background:var(--accent-soft); color:var(--accent); display:grid; place-items:center; flex-shrink:0">
-                <?= icon('layers', 20) ?>
+                <?= icon('puzzle', 20) ?>
               </div>
               <div style="flex:1; min-width:0">
                 <div style="display:flex; align-items:center; gap:8px">

@@ -176,7 +176,7 @@ if (!function_exists('human_bytes')) {
 </div>
 
 <div class="stat-grid">
-  <?= stat_card(__('bk_stat_total', 'Respaldos totales'), (string)$total, 'layers', ['sub'=>__('bk_stat_total_sub', 'En historial')]) ?>
+  <?= stat_card(__('bk_stat_total', 'Respaldos totales'), (string)$total, 'archive', ['sub'=>__('bk_stat_total_sub', 'En historial')]) ?>
   <?= stat_card(__('bk_stat_space', 'Espacio usado'), human_bytes($total_bytes), 'download') ?>
   <?= stat_card(__('bk_stat_last', 'Último respaldo'), $last ? kp_relative_time(is_numeric($last['created_at']) ? (int)$last['created_at'] : strtotime($last['created_at'])) : __('bk_never', 'Nunca'), 'check',
        ['sub'=>$last ? ($last['podcast_title'] ?? __('bk_all_instance', 'Toda la instancia')) : '—']) ?>

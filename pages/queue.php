@@ -115,7 +115,7 @@ $status_colors = [
 
 <?php if (!$queue): ?>
   <div class="card card-lg" style="text-align:center;padding:64px 24px">
-    <div style="font-size:48px;margin-bottom:12px;opacity:.4"><?= icon('layers',48) ?></div>
+    <div style="font-size:48px;margin-bottom:12px;opacity:.4"><?= icon('cpu',48) ?></div>
     <h3 style="margin:0 0 8px"><?= __('queue_empty_title', 'Cola vacía') ?></h3>
     <p class="muted" style="margin:0"><?= __('queue_empty_desc', 'No hay procesos en espera ni historiales recientes de entrega al Fediverso.') ?></p>
   </div>

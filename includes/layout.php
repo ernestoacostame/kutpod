@@ -116,10 +116,10 @@ $is_auth_page = in_array($page, ['login', 'login-2fa', 'forgot', 'reset', 'recov
         <span class="nav-icon"><?= icon('refreshCw') ?></span> <span class="nav-text"><?= __('nav_update') ?></span>
         <span class="badge" id="kp-update-badge" style="background:var(--accent);color:var(--bg-1);margin-left:auto;font-size:10px;font-weight:700;<?= $kp_update_available ? '' : 'display:none;' ?>">v<?= e($kp_available_ver) ?></span>
       </a>
-      <a class="nav-item <?= $page==='queue'?'active':'' ?>" href="<?= admin_url('queue') ?>" title="<?= __('nav_queue') ?>" data-label="<?= __('nav_queue') ?>"><span class="nav-icon"><?= icon('layers') ?></span> <span class="nav-text"><?= __('nav_queue') ?></span></a>
-      <a class="nav-item <?= $page==='backups'?'active':'' ?>" href="<?= admin_url('backups') ?>" title="<?= __('nav_backups') ?>" data-label="<?= __('nav_backups') ?>"><span class="nav-icon"><?= icon('layers') ?></span> <span class="nav-text"><?= __('nav_backups') ?></span></a>
+      <a class="nav-item <?= $page==='queue'?'active':'' ?>" href="<?= admin_url('queue') ?>" title="<?= __('nav_queue') ?>" data-label="<?= __('nav_queue') ?>"><span class="nav-icon"><?= icon('cpu') ?></span> <span class="nav-text"><?= __('nav_queue') ?></span></a>
+      <a class="nav-item <?= $page==='backups'?'active':'' ?>" href="<?= admin_url('backups') ?>" title="<?= __('nav_backups') ?>" data-label="<?= __('nav_backups') ?>"><span class="nav-icon"><?= icon('archive') ?></span> <span class="nav-text"><?= __('nav_backups') ?></span></a>
       <a class="nav-item <?= $page==='preferences'?'active':'' ?>" href="<?= admin_url('preferences') ?>" title="<?= __('nav_preferences') ?>" data-label="<?= __('nav_preferences') ?>"><span class="nav-icon"><?= icon('settings') ?></span> <span class="nav-text"><?= __('nav_preferences') ?></span></a>
-      <a class="nav-item <?= $page==='plugins'?'active':'' ?>" href="<?= admin_url('plugins') ?>" title="<?= __('nav_plugins') ?>" data-label="<?= __('nav_plugins') ?>"><span class="nav-icon"><?= icon('layers') ?></span> <span class="nav-text"><?= __('nav_plugins') ?></span></a>
+      <a class="nav-item <?= $page==='plugins'?'active':'' ?>" href="<?= admin_url('plugins') ?>" title="<?= __('nav_plugins') ?>" data-label="<?= __('nav_plugins') ?>"><span class="nav-icon"><?= icon('puzzle') ?></span> <span class="nav-text"><?= __('nav_plugins') ?></span></a>
       <a class="nav-item <?= $page==='users'?'active':'' ?>" href="<?= admin_url('users') ?>" title="<?= __('nav_users') ?>" data-label="<?= __('nav_users') ?>"><span class="nav-icon"><?= icon('users') ?></span> <span class="nav-text"><?= __('nav_users') ?></span></a>
     </div>
     <div class="nav-section">

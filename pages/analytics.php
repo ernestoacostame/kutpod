@@ -268,8 +268,8 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
     <?= stat_card(__('analytics_total_downloads', 'Descargas totales'), number_format($tot), 'download') ?>
     <?= stat_card(__('analytics_downloads_period', 'Descargas · :range', ['range' => $range]), number_format($tot_period), 'chart') ?>
     <?= stat_card(__('analytics_unique_listeners', 'Oyentes únicos'), number_format($unique_listeners), 'users', ['sub'=>__('analytics_identified_op3', 'identificados por OP3')]) ?>
-    <?= stat_card(__('analytics_avg_playback', 'Tiempo promedio'), $global_playback['avg_playback_fmt'], 'clock', ['sub' => $global_playback['avg_completion_pct'] . '% ' . __('analytics_avg_playback_sub', 'retención media')]) ?>
-    <?= stat_card(__('analytics_total_time_listened', 'Tiempo total escuchado'), $global_playback['total_time_fmt'], 'headphones', ['sub' => __('analytics_total_hours_sub', 'horas de atención')]) ?>
+    <?= stat_card(__('analytics_avg_playback', 'Tiempo promedio'), $global_playback['avg_playback_fmt'], 'clock', ['sub' => $global_playback['avg_completion_pct'] > 0 ? ($global_playback['avg_completion_pct'] . '% ' . __('analytics_avg_playback_sub', 'retención media')) : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
+    <?= stat_card(__('analytics_total_time_listened', 'Tiempo total escuchado'), $global_playback['total_time_fmt'], 'headphones', ['sub' => $global_playback['total_time_fmt'] !== '—' ? __('analytics_total_hours_sub', 'horas de atención') : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
     <?= stat_card(__('analytics_active_podcasts', 'Podcasts activos'), (string)count($podcasts), 'mic') ?>
     <?php kp_do_action('analytics_stat_grid'); ?>
   </div>

@@ -1080,6 +1080,7 @@ return [
     'pod_stat_retention_sub' => 'average retention',
     'pod_stat_total_listened' => 'Time consumed',
     'pod_stat_sponsors_sub' => 'audience attention',
+    'pod_stat_no_telemetry' => 'awaiting web telemetry',
     'pod_episodes_count_header' => 'Episodes — :count',
     'pod_all_seasons' => 'All seasons',
     'pod_season_label' => 'Season :num',

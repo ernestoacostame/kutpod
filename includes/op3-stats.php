@@ -299,25 +299,20 @@ function kp_op3_episode_playback_stats(int $episodeId, int $days = 30): array {
     }
   } catch (Throwable $e) {}
 
-  // Cálculo de retención media y tiempo promedio de escucha
+  // Cálculo de retención media y tiempo promedio de escucha basado en telemetría real
   if ($plays > 0 && $dur > 0 && $webSecs > 0) {
     $avgSecsPerPlay = (int)round($webSecs / $plays);
     $retentionRate = min(1.0, max(0.05, $avgSecsPerPlay / $dur));
     $avgPlaybackSecs = (int)round($dur * $retentionRate);
     $completionPct = round($retentionRate * 100, 1);
-  } elseif ($dur > 0 && ($dl > 0 || $plays > 0)) {
-    // Estimación IAB v2 estándar (benchmark medio del sector: 75% retención)
-    $retentionRate = 0.75;
-    $avgPlaybackSecs = (int)round($dur * $retentionRate);
-    $completionPct = 75.0;
+    $audienceCount = max($dl, $plays);
+    $totalTimeSecs = (int)round($audienceCount * $avgPlaybackSecs);
   } else {
     $retentionRate = 0;
     $avgPlaybackSecs = 0;
     $completionPct = 0.0;
+    $totalTimeSecs = 0;
   }
-
-  $audienceCount = max($dl, $plays);
-  $totalTimeSecs = (int)round($audienceCount * $avgPlaybackSecs);
 
   return [
     'duration_secs'     => $dur,
@@ -331,7 +326,7 @@ function kp_op3_episode_playback_stats(int $episodeId, int $days = 30): array {
     'avg_playback_fmt'  => $avgPlaybackSecs > 0 ? kp_fmt_duration($avgPlaybackSecs) : '—',
     'completion_pct'    => $completionPct,
     'total_time_secs'   => $totalTimeSecs,
-    'total_time_fmt'    => kp_fmt_hours_mins($totalTimeSecs)
+    'total_time_fmt'    => $totalTimeSecs > 0 ? kp_fmt_hours_mins($totalTimeSecs) : '—'
   ];
 }
 
@@ -388,9 +383,9 @@ function kp_op3_podcast_playback_stats(int $podcastId, int $days = 30): array {
 
   $epCount = count($eps);
   $avgDurationSecs = $validDurCount > 0 ? (int)round($sumDuration / $validDurCount) : 0;
-  $weightDenominator = max(1, $totalDl > 0 ? $totalDl : $epCount);
-  $avgPlaybackSecs = (int)round($weightedPlaybackSum / $weightDenominator);
-  $avgCompletionPct = round($weightedPctSum / $weightDenominator, 1);
+  $hasMeasuredPlays = ($totalSecsAccum > 0 && $weightedPlaybackSum > 0);
+  $avgPlaybackSecs = $hasMeasuredPlays ? (int)round($weightedPlaybackSum / max(1, $totalDl)) : 0;
+  $avgCompletionPct = $hasMeasuredPlays ? round($weightedPctSum / max(1, $totalDl), 1) : 0.0;
 
   return [
     'podcast_id'         => $podcastId,
@@ -404,7 +399,7 @@ function kp_op3_podcast_playback_stats(int $podcastId, int $days = 30): array {
     'avg_playback_fmt'   => $avgPlaybackSecs > 0 ? kp_fmt_duration($avgPlaybackSecs) : '—',
     'avg_completion_pct' => $avgCompletionPct,
     'total_time_secs'    => $totalSecsAccum,
-    'total_time_fmt'     => kp_fmt_hours_mins($totalSecsAccum)
+    'total_time_fmt'     => $totalSecsAccum > 0 ? kp_fmt_hours_mins($totalSecsAccum) : '—'
   ];
 }
 
@@ -422,7 +417,7 @@ function kp_op3_all_podcasts_playback_totals(int $days = 30): array {
       'avg_playback_fmt'   => '—',
       'avg_completion_pct' => 0.0,
       'total_time_secs'    => 0,
-      'total_time_fmt'     => '0m'
+      'total_time_fmt'     => '—'
     ];
   }
 
@@ -438,14 +433,16 @@ function kp_op3_all_podcasts_playback_totals(int $days = 30): array {
     $totalBd += $ps['bot_downloads'];
     $totalTimeSecs += $ps['total_time_secs'];
 
-    $weight = max(1, $ps['downloads']);
-    $weightedPlaybackSum += ($ps['avg_playback_secs'] * $weight);
-    $weightedPctSum += ($ps['avg_completion_pct'] * $weight);
+    if ($ps['avg_playback_secs'] > 0) {
+      $weight = max(1, $ps['downloads']);
+      $weightedPlaybackSum += ($ps['avg_playback_secs'] * $weight);
+      $weightedPctSum += ($ps['avg_completion_pct'] * $weight);
+    }
   }
 
-  $weightDenominator = max(1, $totalDl > 0 ? $totalDl : count($podcasts));
-  $avgPlaybackSecs = (int)round($weightedPlaybackSum / $weightDenominator);
-  $avgCompletionPct = round($weightedPctSum / $weightDenominator, 1);
+  $hasMeasuredPlays = ($totalTimeSecs > 0 && $weightedPlaybackSum > 0);
+  $avgPlaybackSecs = $hasMeasuredPlays ? (int)round($weightedPlaybackSum / max(1, $totalDl)) : 0;
+  $avgCompletionPct = $hasMeasuredPlays ? round($weightedPctSum / max(1, $totalDl), 1) : 0.0;
 
   return [
     'downloads'          => $totalDl,
@@ -455,7 +452,7 @@ function kp_op3_all_podcasts_playback_totals(int $days = 30): array {
     'avg_playback_fmt'   => $avgPlaybackSecs > 0 ? kp_fmt_duration($avgPlaybackSecs) : '—',
     'avg_completion_pct' => $avgCompletionPct,
     'total_time_secs'    => $totalTimeSecs,
-    'total_time_fmt'     => kp_fmt_hours_mins($totalTimeSecs)
+    'total_time_fmt'     => $totalTimeSecs > 0 ? kp_fmt_hours_mins($totalTimeSecs) : '—'
   ];
 }
 

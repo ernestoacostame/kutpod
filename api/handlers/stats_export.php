@@ -136,8 +136,8 @@ try {
             $podStats['bot_downloads'] ?? 0,
             $podStats['avg_duration_fmt'] ?? '—',
             $podStats['avg_playback_fmt'] ?? '—',
-            ($podStats['avg_completion_pct'] ?? 0) . '%',
-            $podStats['total_time_fmt'] ?? '0m'
+            ($podStats['avg_completion_pct'] ?? 0) > 0 ? ($podStats['avg_completion_pct'] . '%') : '—',
+            $podStats['total_time_fmt'] ?? '—'
         ]);
 
         // Episodios particulares de este podcast
@@ -179,8 +179,8 @@ try {
                     $epStats['bot_downloads'] ?? 0,
                     $epStats['duration_fmt'] ?? '—',
                     $epStats['avg_playback_fmt'] ?? '—',
-                    ($epStats['completion_pct'] ?? 0) . '%',
-                    $epStats['total_time_fmt'] ?? '0m'
+                    ($epStats['completion_pct'] ?? 0) > 0 ? ($epStats['completion_pct'] . '%') : '—',
+                    $epStats['total_time_fmt'] ?? '—'
                 ]);
             }
         }

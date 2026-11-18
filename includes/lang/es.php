@@ -1080,6 +1080,7 @@ return [
     'pod_stat_retention_sub' => 'retención media',
     'pod_stat_total_listened' => 'Tiempo consumido',
     'pod_stat_sponsors_sub' => 'atención de audiencia',
+    'pod_stat_no_telemetry' => 'esperando telemetría web',
     'pod_episodes_count_header' => 'Episodios — :count',
     'pod_all_seasons' => 'Todas las temporadas',
     'pod_season_label' => 'Temporada :num',

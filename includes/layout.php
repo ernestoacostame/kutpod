@@ -55,24 +55,42 @@ if ($logo) {
 <?php
 $is_auth_page = in_array($page, ['login', 'login-2fa', 'forgot', 'reset', 'recover'], true);
 ?>
+<?php if (!$is_auth_page): ?>
+<script>
+(function() {
+  if (localStorage.getItem('kutpod_sidebar_collapsed') === '1') {
+    document.body.classList.add('sidebar-collapsed');
+  }
+})();
+</script>
+<?php endif; ?>
 <div class="app <?= $is_auth_page ? 'app-login' : '' ?>">
   <?php if (!$is_auth_page): ?>
   <aside class="sidebar">
-    <div class="brand" style="justify-content:space-between">
-      <div style="display:flex;align-items:center;gap:12px">
+    <div class="brand">
+      <div class="brand-info" style="display:flex;align-items:center;gap:12px;min-width:0;flex:1">
         <?php if ($logo): ?>
-          <img src="<?= e($logo) ?>" style="width:24px;height:24px;border-radius:6px;object-fit:cover">
+          <img src="<?= e($logo) ?>" style="width:24px;height:24px;border-radius:6px;object-fit:cover;flex-shrink:0">
         <?php else: ?>
           <div class="brand-mark">K</div>
         <?php endif; ?>
-        <div><div class="brand-name">KutPod</div><div class="brand-sub">Studio · v<?= KUTPOD_VERSION ?></div></div>
+        <div class="brand-text" style="min-width:0;overflow:hidden;white-space:nowrap"><div class="brand-name">KutPod</div><div class="brand-sub">Studio · v<?= KUTPOD_VERSION ?></div></div>
       </div>
-      <a href="/" target="_blank" rel="noopener" class="btn btn-ghost" style="padding:4px 8px;font-size:11px"><?= __('view_site') ?></a>
+      <div class="brand-actions" style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <a href="/" target="_blank" rel="noopener" class="btn btn-ghost btn-view-site" style="padding:4px 8px;font-size:11px" title="<?= __('view_site') ?>"><?= __('view_site') ?></a>
+        <button type="button" class="sidebar-toggle" id="sidebar-toggle" title="<?= __('nav_collapse', 'Contraer/Expandir menú') ?>" aria-label="Toggle sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
     </div>
     <div class="nav-section">
-      <a class="nav-item <?= $page==='overview'?'active':'' ?>" href="<?= admin_url() ?>"><?= icon('grid') ?> <?= __('nav_overview') ?></a>
-      <a class="nav-item <?= $page==='alerts'?'active':'' ?>" href="<?= admin_url('alerts') ?>">
-        <?= icon('bell') ?> <?= __('nav_alerts') ?>
+      <a class="nav-item <?= $page==='overview'?'active':'' ?>" href="<?= admin_url() ?>" title="<?= __('nav_overview') ?>" data-label="<?= __('nav_overview') ?>">
+        <span class="nav-icon"><?= icon('grid') ?></span>
+        <span class="nav-text"><?= __('nav_overview') ?></span>
+      </a>
+      <a class="nav-item <?= $page==='alerts'?'active':'' ?>" href="<?= admin_url('alerts') ?>" title="<?= __('nav_alerts') ?>" data-label="<?= __('nav_alerts') ?>">
+        <span class="nav-icon"><?= icon('bell') ?></span>
+        <span class="nav-text"><?= __('nav_alerts') ?></span>
         <?php if ($unread_alerts): ?>
           <span class="badge" style="<?= $page==='alerts' ? '' : 'background:var(--accent);color:var(--bg-1)' ?>"><?= $unread_alerts ?></span>
         <?php endif; ?>
@@ -80,47 +98,47 @@ $is_auth_page = in_array($page, ['login', 'login-2fa', 'forgot', 'reset', 'recov
     </div>
     <div class="nav-section">
       <div class="nav-label"><?= __('nav_podcasts') ?></div>
-      <a class="nav-item <?= in_array($page,['podcasts','podcast'])?'active':'' ?>" href="<?= admin_url('podcasts') ?>"><?= icon('mic') ?> <?= __('nav_all_podcasts') ?></a>
-      <a class="nav-item <?= $page==='new-podcast'?'active':'' ?>" href="<?= admin_url('new-podcast') ?>"><?= icon('plus') ?> <?= __('nav_new_podcast') ?></a>
-      <a class="nav-item <?= $page==='import'?'active':'' ?>" href="<?= admin_url('import') ?>"><?= icon('rss') ?> <?= __('nav_import_rss') ?></a>
+      <a class="nav-item <?= in_array($page,['podcasts','podcast'])?'active':'' ?>" href="<?= admin_url('podcasts') ?>" title="<?= __('nav_all_podcasts') ?>" data-label="<?= __('nav_all_podcasts') ?>"><span class="nav-icon"><?= icon('mic') ?></span> <span class="nav-text"><?= __('nav_all_podcasts') ?></span></a>
+      <a class="nav-item <?= $page==='new-podcast'?'active':'' ?>" href="<?= admin_url('new-podcast') ?>" title="<?= __('nav_new_podcast') ?>" data-label="<?= __('nav_new_podcast') ?>"><span class="nav-icon"><?= icon('plus') ?></span> <span class="nav-text"><?= __('nav_new_podcast') ?></span></a>
+      <a class="nav-item <?= $page==='import'?'active':'' ?>" href="<?= admin_url('import') ?>" title="<?= __('nav_import_rss') ?>" data-label="<?= __('nav_import_rss') ?>"><span class="nav-icon"><?= icon('rss') ?></span> <span class="nav-text"><?= __('nav_import_rss') ?></span></a>
     </div>
     <div class="nav-section">
       <div class="nav-label"><?= __('nav_network') ?></div>
-      <a class="nav-item <?= $page==='analytics'?'active':'' ?>" href="<?= admin_url('analytics') ?>"><?= icon('chart') ?> <?= __('nav_analytics') ?></a>
+      <a class="nav-item <?= $page==='analytics'?'active':'' ?>" href="<?= admin_url('analytics') ?>" title="<?= __('nav_analytics') ?>" data-label="<?= __('nav_analytics') ?>"><span class="nav-icon"><?= icon('chart') ?></span> <span class="nav-text"><?= __('nav_analytics') ?></span></a>
       <?php if (kp_plugin_is_active('fediverse')): ?>
-        <a class="nav-item <?= $page==='fediverse'?'active':'' ?>" href="<?= admin_url('fediverse') ?>"><?= icon('globe') ?> <?= __('nav_fediverse') ?></a>
+        <a class="nav-item <?= $page==='fediverse'?'active':'' ?>" href="<?= admin_url('fediverse') ?>" title="<?= __('nav_fediverse') ?>" data-label="<?= __('nav_fediverse') ?>"><span class="nav-icon"><?= icon('globe') ?></span> <span class="nav-text"><?= __('nav_fediverse') ?></span></a>
       <?php endif; ?>
-      <a class="nav-item <?= $page==='pages'?'active':'' ?>" href="<?= admin_url('pages') ?>"><?= icon('file') ?> <?= __('nav_pages') ?></a>
+      <a class="nav-item <?= $page==='pages'?'active':'' ?>" href="<?= admin_url('pages') ?>" title="<?= __('nav_pages') ?>" data-label="<?= __('nav_pages') ?>"><span class="nav-icon"><?= icon('file') ?></span> <span class="nav-text"><?= __('nav_pages') ?></span></a>
     </div>
     <div class="nav-section">
       <div class="nav-label"><?= __('nav_admin') ?></div>
-      <a class="nav-item <?= $page==='update'?'active':'' ?>" href="<?= admin_url('update') ?>">
-        <?= icon('refreshCw') ?> <span><?= __('nav_update') ?></span>
+      <a class="nav-item <?= $page==='update'?'active':'' ?>" href="<?= admin_url('update') ?>" title="<?= __('nav_update') ?>" data-label="<?= __('nav_update') ?>">
+        <span class="nav-icon"><?= icon('refreshCw') ?></span> <span class="nav-text"><?= __('nav_update') ?></span>
         <span class="badge" id="kp-update-badge" style="background:var(--accent);color:var(--bg-1);margin-left:auto;font-size:10px;font-weight:700;<?= $kp_update_available ? '' : 'display:none;' ?>">v<?= e($kp_available_ver) ?></span>
       </a>
-      <a class="nav-item <?= $page==='queue'?'active':'' ?>" href="<?= admin_url('queue') ?>"><?= icon('layers') ?> <?= __('nav_queue') ?></a>
-      <a class="nav-item <?= $page==='backups'?'active':'' ?>" href="<?= admin_url('backups') ?>"><?= icon('layers') ?> <?= __('nav_backups') ?></a>
-      <a class="nav-item <?= $page==='preferences'?'active':'' ?>" href="<?= admin_url('preferences') ?>"><?= icon('settings') ?> <?= __('nav_preferences') ?></a>
-      <a class="nav-item <?= $page==='plugins'?'active':'' ?>" href="<?= admin_url('plugins') ?>"><?= icon('layers') ?> <?= __('nav_plugins') ?></a>
-      <a class="nav-item <?= $page==='users'?'active':'' ?>" href="<?= admin_url('users') ?>"><?= icon('users') ?> <?= __('nav_users') ?></a>
+      <a class="nav-item <?= $page==='queue'?'active':'' ?>" href="<?= admin_url('queue') ?>" title="<?= __('nav_queue') ?>" data-label="<?= __('nav_queue') ?>"><span class="nav-icon"><?= icon('layers') ?></span> <span class="nav-text"><?= __('nav_queue') ?></span></a>
+      <a class="nav-item <?= $page==='backups'?'active':'' ?>" href="<?= admin_url('backups') ?>" title="<?= __('nav_backups') ?>" data-label="<?= __('nav_backups') ?>"><span class="nav-icon"><?= icon('layers') ?></span> <span class="nav-text"><?= __('nav_backups') ?></span></a>
+      <a class="nav-item <?= $page==='preferences'?'active':'' ?>" href="<?= admin_url('preferences') ?>" title="<?= __('nav_preferences') ?>" data-label="<?= __('nav_preferences') ?>"><span class="nav-icon"><?= icon('settings') ?></span> <span class="nav-text"><?= __('nav_preferences') ?></span></a>
+      <a class="nav-item <?= $page==='plugins'?'active':'' ?>" href="<?= admin_url('plugins') ?>" title="<?= __('nav_plugins') ?>" data-label="<?= __('nav_plugins') ?>"><span class="nav-icon"><?= icon('layers') ?></span> <span class="nav-text"><?= __('nav_plugins') ?></span></a>
+      <a class="nav-item <?= $page==='users'?'active':'' ?>" href="<?= admin_url('users') ?>" title="<?= __('nav_users') ?>" data-label="<?= __('nav_users') ?>"><span class="nav-icon"><?= icon('users') ?></span> <span class="nav-text"><?= __('nav_users') ?></span></a>
     </div>
     <div class="nav-section">
       <div class="nav-label"><?= __('nav_other') ?></div>
-      <a class="nav-item <?= $page==='api'?'active':'' ?>" href="<?= admin_url('api') ?>"><?= icon('share') ?> <?= __('nav_api') ?></a>
+      <a class="nav-item <?= $page==='api'?'active':'' ?>" href="<?= admin_url('api') ?>" title="<?= __('nav_api') ?>" data-label="<?= __('nav_api') ?>"><span class="nav-icon"><?= icon('share') ?></span> <span class="nav-text"><?= __('nav_api') ?></span></a>
     </div>
     <div class="sidebar-footer">
-      <a href="<?= admin_url('users') ?>" style="display:flex; align-items:center; gap:10px; flex:1; min-width:0; text-decoration:none; color:inherit;">
+      <a href="<?= admin_url('users') ?>" class="user-row" style="display:flex; align-items:center; gap:10px; flex:1; min-width:0; text-decoration:none; color:inherit;">
         <?php if (!empty($current_user['avatar'])): ?>
           <img src="<?= e($current_user['avatar']) ?>" class="avatar" style="object-fit:cover" alt="">
         <?php else: ?>
           <div class="avatar"><?= e(strtoupper(substr($current_user['name'] ?? 'EA',0,2))) ?></div>
         <?php endif; ?>
-        <div style="min-width:0;flex:1">
+        <div class="user-meta" style="min-width:0;flex:1">
           <div style="font-size:13px;font-weight:500"><?= e($current_user['name'] ?? 'Owner') ?></div>
           <div style="font-size:11px;color:var(--text-3)"><?= e(ucfirst($current_user['role'] ?? 'owner')) ?></div>
         </div>
       </a>
-      <a class="kebab" href="/admin?action=logout" title="<?= __('logout') ?>"><?= icon('logOut') ?></a>
+      <a class="kebab logout-btn" href="/admin?action=logout" title="<?= __('logout') ?>"><?= icon('logOut') ?></a>
     </div>
   </aside>
   <?php endif; ?>
@@ -189,6 +207,15 @@ function dismissUpdateBanner(app) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+  var toggle = document.getElementById('sidebar-toggle');
+  if (toggle) {
+    toggle.addEventListener('click', function() {
+      document.body.classList.toggle('sidebar-collapsed');
+      localStorage.setItem('kutpod_sidebar_collapsed',
+        document.body.classList.contains('sidebar-collapsed') ? '1' : '0');
+    });
+  }
+
   var banner = document.getElementById('kp-update-banner');
   var badge = document.getElementById('kp-update-badge');
   var verLabel = document.getElementById('kp-update-ver-label');

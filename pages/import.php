@@ -97,7 +97,7 @@ window.KP_IMP = (function () {
     const url = $('#imp_url').value.trim();
     if (!url) return;
     $('#imp_preview').innerHTML = `<div class="help">${IMP_I18N.analyzing}</div>`;
-    const fd = new FormData(); fd.append('url', url);
+    const fd = new FormData(); fd.append('url', url); fd.append('_csrf', '<?= kp_csrf_token() ?>');
     const r = await fetch('/import-api.php?action=analyze', { method: 'POST', body: fd }).then(r => r.json());
     if (r.error) { $('#imp_preview').innerHTML = `<div class="error">${r.error}</div>`; return; }
     $('#imp_preview').innerHTML = `
@@ -125,6 +125,7 @@ window.KP_IMP = (function () {
     fd.append('url', url);
     fd.append('target_id', $('#imp_target').value);
     fd.append('options', JSON.stringify(opts()));
+    fd.append('_csrf', '<?= kp_csrf_token() ?>');
     const r = await fetch('/import-api.php?action=create', { method: 'POST', body: fd }).then(r => r.json());
     if (r.error) return alert(r.error);
     jobId = r.job_id;
@@ -181,7 +182,7 @@ window.KP_IMP = (function () {
   }
   async function cancel() { if(jobId) await postAction('cancel'); }
   function postAction(a) {
-    const fd = new FormData(); fd.append('job', jobId);
+    const fd = new FormData(); fd.append('job', jobId); fd.append('_csrf', '<?= kp_csrf_token() ?>');
     return fetch('/import-api.php?action=' + a, { method:'POST', body: fd });
   }
 

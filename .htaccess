@@ -93,6 +93,7 @@ RewriteRule ^$  /site.php  [L]
 RewriteRule ^(pages|includes|api/handlers|public)/  -  [F,L]
 RewriteRule ^cli/(?!install\.php)  -  [F,L]
 RewriteRule ^storage/(?!media/)  -  [F,L]
+RewriteRule ^media/.*\.(php[0-9]?|phtml|phar|pl|py|cgi|sh)$  -  [F,L,NC]
 
 # Cualquier otra cosa que no exista físicamente → home pública (nunca panel)
 RewriteCond %{REQUEST_FILENAME} !-f

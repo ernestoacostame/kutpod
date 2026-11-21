@@ -70,26 +70,40 @@ function kp_check_scheduled() {
     $stmt->execute([$now, $now]);
 
     $domain = kp_setting('instance_domain', $_SERVER['HTTP_HOST'] ?? 'localhost');
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+    $protocol = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? 80) == 443)) ? "https://" : "http://";
 
-    foreach ($pending as $ep) {
-      $p = kp_find_podcast((string)$ep['podcast_id']);
-      if ($p) {
-        $feed_url = kp_canonical_feed_url($p['id'] ?? '');
-        if (function_exists('kp_notify_websub')) kp_notify_websub($feed_url);
+    register_shutdown_function(function () use ($pending, $domain, $protocol) {
+      if (function_exists('fastcgi_finish_request')) {
+        @fastcgi_finish_request();
       }
-      
-      // Lanzar gancho de publicación de episodio
-      try {
-        $ep_url = $protocol . $domain . '/@' . ($p['id'] ?? '') . '/' . $ep['slug'];
-        kp_do_action('episode_published', (int)$ep['id'], (int)$ep['podcast_id'], $ep['title'], '', $ep_url);
-      } catch (Throwable $e) {}
-    }
+      @ignore_user_abort(true);
+
+      foreach ($pending as $ep) {
+        $p = kp_find_podcast((string)$ep['podcast_id']);
+        if ($p) {
+          $feed_url = kp_canonical_feed_url($p['id'] ?? '');
+          if (function_exists('kp_notify_websub')) kp_notify_websub($feed_url);
+        }
+
+        // Lanzar gancho de publicación de episodio
+        try {
+          $ep_url = $protocol . $domain . '/@' . ($p['id'] ?? '') . '/' . $ep['slug'];
+          kp_do_action('episode_published', (int)$ep['id'], (int)$ep['podcast_id'], $ep['title'], '', $ep_url);
+        } catch (Throwable $e) {}
+      }
+    });
   } catch (Throwable $e) {}
 }
 
+/** Formatea una fila de episodio con duración y fecha relativa. */
+function kp_format_episode_row(array $r): array {
+  $r['duration'] = kp_fmt_duration((int)($r['duration_secs'] ?? 0));
+  $r['date']     = kp_fmt_relative_date($r['date_iso'] ?? '');
+  return $r;
+}
+
 /** Episodios recientes globales (todos los podcasts), pre-formateados para tablas. */
-function kp_episodes(bool $all = false, ?string $podcastSlug = null, ?int $limit = null): array {
+function kp_episodes(bool $all = false, ?string $podcastSlug = null, ?int $limit = null, int $offset = 0): array {
   kp_check_scheduled();
   try {
     $where = $all ? "WHERE e.hidden = 0" : "WHERE e.hidden = 0
@@ -104,7 +118,12 @@ function kp_episodes(bool $all = false, ?string $podcastSlug = null, ?int $limit
       $params_q[':pslug'] = strtolower($podcastSlug);
     }
 
-    $limit_sql = ($limit !== null && $limit > 0) ? "LIMIT " . (int)$limit : "";
+    $limit_sql = '';
+    if ($limit !== null && $limit > 0) {
+      $limit_sql = "LIMIT :lim OFFSET :off";
+      $params_q[':lim'] = $limit;
+      $params_q[':off'] = max(0, $offset);
+    }
 
     $rows = kp_q("
       SELECT
@@ -117,7 +136,7 @@ function kp_episodes(bool $all = false, ?string $podcastSlug = null, ?int $limit
         e.title                                 AS title,
         COALESCE(e.guest,'—')                   AS guest,
         e.duration_secs                         AS duration_secs,
-        (SELECT COALESCE(SUM(s.downloads),0) FROM op3_stats_daily s WHERE s.episode_id = e.id) AS downloads,
+        COALESCE(dl.dl_total, 0)                AS downloads,
         e.status                                AS status,
         e.cover                                 AS cover,
         e.audio_url                             AS audio_url,
@@ -130,42 +149,13 @@ function kp_episodes(bool $all = false, ?string $podcastSlug = null, ?int $limit
         COALESCE(e.published_at, e.publish_at, e.created_at) AS date_iso
       FROM episodes e
       JOIN podcasts p ON p.id = e.podcast_id
+      LEFT JOIN (SELECT episode_id, SUM(downloads) AS dl_total FROM op3_stats_daily GROUP BY episode_id) dl ON dl.episode_id = e.id
       $where
       ORDER BY COALESCE(e.published_at, e.publish_at, e.created_at) DESC
       $limit_sql
     ", $params_q);
     foreach ($rows as &$r) {
-      if ((int)($r['duration_secs'] ?? 0) <= 0) {
-        $foundPath = '';
-        if (!empty($r['audio_url']) && strpos($r['audio_url'], '/media/') === 0) {
-          $candidate = __DIR__ . $r['audio_url'];
-          if (file_exists($candidate)) $foundPath = $candidate;
-        }
-        if (!$foundPath && !empty($r['podcast']) && !empty($r['id'])) {
-          $dir = __DIR__ . '/media/audio/' . $r['podcast'];
-          if (is_dir($dir)) {
-            foreach (['mp3', 'm4a', 'ogg', 'wav', 'flac', 'aac'] as $ext) {
-              $candidate = $dir . '/' . $r['id'] . '.' . $ext;
-              if (file_exists($candidate)) {
-                $foundPath = $candidate;
-                break;
-              }
-            }
-          }
-        }
-        if ($foundPath) {
-          require_once __DIR__ . '/includes/ffmpeg.php';
-          $detected = kp_extract_audio_duration($foundPath);
-          if ($detected > 0) {
-            $r['duration_secs'] = $detected;
-            try {
-              kp_db()->prepare("UPDATE episodes SET duration_secs = ? WHERE id = ?")->execute([$detected, $r['db_id']]);
-            } catch (Throwable $e) {}
-          }
-        }
-      }
-      $r['duration'] = kp_fmt_duration((int)($r['duration_secs'] ?? 0));
-      $r['date']     = kp_fmt_relative_date($r['date_iso'] ?? '');
+      $r = kp_format_episode_row($r);
     }
     return $rows ?: [];
   } catch (Throwable $e) {
@@ -201,12 +191,45 @@ function kp_podcast_or_placeholder(string $id): array {
 
 function kp_find_episode(string $id, string $podcastSlug = ''): ?array {
   if ($id === '') return null;
-  $id = strtolower($id);
-  $podcastSlug = strtolower($podcastSlug);
-  foreach (kp_episodes(true, $podcastSlug ?: null) as $e) {
-    if (strtolower($e['id']) === $id && ($podcastSlug === '' || strtolower($e['podcast']) === $podcastSlug)) return $e;
+  kp_check_scheduled();
+  try {
+    $select = "
+      SELECT
+        e.id                                    AS db_id,
+        e.slug                                  AS id,
+        p.slug                                  AS podcast,
+        COALESCE(e.season,1)                    AS s,
+        COALESCE(e.number,0)                    AS n,
+        e.ep_type                               AS type,
+        e.title                                 AS title,
+        COALESCE(e.guest,'—')                   AS guest,
+        e.duration_secs                         AS duration_secs,
+        COALESCE(dl.dl_total, 0)                AS downloads,
+        e.status                                AS status,
+        e.cover                                 AS cover,
+        e.audio_url                             AS audio_url,
+        e.audio_bytes                           AS audio_bytes,
+        e.transcript_url                        AS transcript_url,
+        e.chapters_url                          AS chapters_url,
+        e.notes_md                              AS notes_md,
+        e.persons_json                          AS persons_json,
+        e.meta_json                             AS meta_json,
+        COALESCE(e.published_at, e.publish_at, e.created_at) AS date_iso
+      FROM episodes e
+      JOIN podcasts p ON p.id = e.podcast_id
+      LEFT JOIN (SELECT episode_id, SUM(downloads) AS dl_total FROM op3_stats_daily GROUP BY episode_id) dl ON dl.episode_id = e.id
+    ";
+    if ($podcastSlug !== '') {
+      $p = kp_find_podcast($podcastSlug);
+      if (!$p || empty($p['db_id'])) return null;
+      $row = kp_one($select . " WHERE e.hidden = 0 AND e.podcast_id = ? AND e.slug = ? COLLATE NOCASE LIMIT 1", [(int)$p['db_id'], $id]);
+    } else {
+      $row = kp_one($select . " WHERE e.hidden = 0 AND e.slug = ? COLLATE NOCASE LIMIT 1", [$id]);
+    }
+    return $row ? kp_format_episode_row($row) : null;
+  } catch (Throwable $e) {
+    return null;
   }
-  return null;
 }
 
 /** Posts del blog editorial · si no hay tabla pages_blog devuelve []. */

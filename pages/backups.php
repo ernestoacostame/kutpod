@@ -4,6 +4,42 @@
 // ============================================================================
 require_once __DIR__ . '/../includes/helpers.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+
+kp_require_role('owner', 'admin');
+
+// Descarga autenticada de respaldos (storage/backups/ y legado media/backups/)
+if (isset($_GET['download'])) {
+  $fname = basename((string)$_GET['download']);
+  if (!preg_match('/^[a-zA-Z0-9._-]+$/', $fname)) {
+    http_response_code(400);
+    exit('Nombre de archivo inválido');
+  }
+  $candidates = [
+    __DIR__ . '/../storage/backups/' . $fname,
+    __DIR__ . '/../media/backups/' . $fname,
+  ];
+  $filePath = null;
+  foreach ($candidates as $cand) {
+    if (is_file($cand)) {
+      $filePath = $cand;
+      break;
+    }
+  }
+  if (!$filePath) {
+    http_response_code(404);
+    exit('Respaldo no encontrado');
+  }
+  while (ob_get_level()) {
+    ob_end_clean();
+  }
+  header('Content-Type: application/octet-stream');
+  header('Content-Disposition: attachment; filename="' . $fname . '"');
+  header('Content-Length: ' . filesize($filePath));
+  header('X-Content-Type-Options: nosniff');
+  readfile($filePath);
+  exit;
+}
 
 // POST: política / nuevo respaldo
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -23,8 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $pid = ($type === 'zip' && !empty($_POST['podcast_id'])) ? (int)$_POST['podcast_id'] : null;
     
     // Create actual backup of the DB
-    $bkDir = __DIR__ . '/../media/backups';
-    @mkdir($bkDir, 0775, true);
+    $bkDir = __DIR__ . '/../storage/backups';
+    if (!is_dir($bkDir)) {
+      @mkdir($bkDir, 0755, true);
+    }
     
     $fname = 'bk_' . date('Ymd_His') . ($type === 'zip' ? '.zip' : '.db');
     $dest = $bkDir . '/' . $fname;
@@ -38,11 +76,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         kp_exec("INSERT INTO backups(podcast_id, kind, bytes, path, created_at)
                  VALUES(?, 'manual', ?, ?, datetime('now'))", 
-                 [$pid, $size, '/media/backups/' . $fname]);
+                 [$pid, $size, '/storage/backups/' . $fname]);
     } else {
         $id = kp_exec("INSERT INTO backups(podcast_id, kind, bytes, path, created_at)
                  VALUES(?, 'manual', 0, ?, datetime('now'))", 
-                 [$pid, '/media/backups/' . $fname]);
+                 [$pid, '/storage/backups/' . $fname]);
         $cmd = "php " . escapeshellarg(__DIR__ . '/../cli/backup_worker.php') . " " . (int)$id . " " . escapeshellarg($dest) . " > /dev/null 2>&1 &";
         exec($cmd);
     }
@@ -67,20 +105,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           } elseif (str_ends_with(strtolower($fullPath), '.zip')) {
              $zip = new ZipArchive();
              if ($zip->open($fullPath) === TRUE) {
-                 if ($zip->locateName('kutpod.db') !== false) {
-                     $tmpDb = __DIR__ . '/../storage/kutpod_tmp.db';
-                     copy('zip://' . $fullPath . '#kutpod.db', $tmpDb);
-                     if (file_exists($tmpDb) && filesize($tmpDb) > 0) {
-                         @unlink($walPath);
-                         @unlink($shmPath);
-                         rename($tmpDb, $dbPath);
+                 $zipSafe = true;
+                 for ($i = 0; $i < $zip->numFiles; $i++) {
+                     $entry = $zip->getNameIndex($i);
+                     $stat = $zip->statIndex($i);
+                     $isSymlink = $stat && ((($stat['external_attributes'] >> 16) & 0170000) === 0120000);
+                     if ($entry === false || $isSymlink || str_contains($entry, '..') || str_starts_with($entry, '/') || str_contains($entry, '\\') || str_contains($entry, "\0")) {
+                         $zipSafe = false;
+                         break;
                      }
                  }
-                 $zip->extractTo(__DIR__ . '/../');
-                 $zip->close();
-                 if (file_exists(__DIR__ . '/../kutpod.db')) {
-                     @unlink(__DIR__ . '/../kutpod.db');
+                 if ($zipSafe) {
+                     if ($zip->locateName('kutpod.db') !== false) {
+                         $tmpDb = __DIR__ . '/../storage/kutpod_tmp.db';
+                         copy('zip://' . $fullPath . '#kutpod.db', $tmpDb);
+                         if (file_exists($tmpDb) && filesize($tmpDb) > 0) {
+                             @unlink($walPath);
+                             @unlink($shmPath);
+                             rename($tmpDb, $dbPath);
+                         }
+                     }
+                     $zip->extractTo(__DIR__ . '/../');
+                     if (file_exists(__DIR__ . '/../kutpod.db')) {
+                         @unlink(__DIR__ . '/../kutpod.db');
+                     }
                  }
+                 $zip->close();
              }
           }
         }
@@ -250,7 +300,7 @@ if (!function_exists('human_bytes')) {
           <div><span class="tag" style="background:<?= $kind_color ?>22;color:<?= $kind_color ?>;font-size:11px"><?= e($kind_label) ?></span></div>
           <div class="row" style="gap:6px;justify-content:flex-end">
             <?php if (!empty($b['path']) && $b['status'] === 'completed'): ?>
-              <a class="kebab" href="<?= e($b['path']) ?>" title="<?= __('download', 'Descargar') ?>" download style="width:32px;height:32px;border-radius:8px;display:inline-grid;place-items:center"><?= icon('download',16) ?></a>
+              <a class="kebab" href="/admin/backups?download=<?= urlencode(basename($b['path'])) ?>" title="<?= __('download', 'Descargar') ?>" download style="width:32px;height:32px;border-radius:8px;display:inline-grid;place-items:center"><?= icon('download',16) ?></a>
               <form method="POST" style="margin:0;display:inline" onsubmit="return confirm('<?= e(__('bk_confirm_restore', '¿Restaurar este respaldo? Reemplazará la base de datos actual.')) ?>')">
                 <?= kp_csrf_field() ?>
                 <input type="hidden" name="_action" value="restore"/>

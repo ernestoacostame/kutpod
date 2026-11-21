@@ -22,6 +22,15 @@ if (!$u || !in_array($u['role'], ['owner', 'admin'], true)) {
 }
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
+$mutatingActions = ['download', 'apply', 'upload', 'rollback', 'clean_downloads'];
+if (in_array($action, $mutatingActions, true)) {
+  if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['error' => 'Esta acción requiere método POST.']);
+    exit;
+  }
+  kp_csrf_verify();
+}
 
 switch ($action) {
 

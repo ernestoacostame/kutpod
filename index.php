@@ -45,7 +45,7 @@ if (!in_array($page, ['login', 'login-2fa', 'forgot', 'reset', 'recover'], true)
 $current_user = kp_current_user();
 
 // CSRF: verificar token en TODOS los POST autenticados del panel admin
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !in_array($page, ['login', 'login-2fa', 'forgot', 'reset', 'recover'], true)) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !in_array($page, ['login', 'forgot', 'reset', 'recover'], true)) {
     kp_csrf_verify();
 }
 if (!in_array($page, $allowed, true)) $page = 'overview';

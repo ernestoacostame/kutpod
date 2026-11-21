@@ -475,27 +475,51 @@ function kp_import_parse_item(string $xml): array {
 // HTTP · descargas robustas
 // ============================================================================
 function kp_http_download(string $url, string $dest, int $retries = KP_IMPORT_RETRIES): int {
+  if (!function_exists('kp_is_safe_remote_url')) {
+    require_once __DIR__ . '/helpers.php';
+  }
   for ($i = 0; $i < $retries; $i++) {
     try {
-      $fp = fopen($dest, 'wb');
-      if (!$fp) throw new RuntimeException("No se pudo abrir destino $dest");
-      $ch = curl_init($url);
-      curl_setopt_array($ch, [
-        CURLOPT_FILE => $fp,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_MAXREDIRS => 5,
-        CURLOPT_TIMEOUT => 0,
-        CURLOPT_CONNECTTIMEOUT => KP_IMPORT_TIMEOUT,
-        CURLOPT_USERAGENT => KP_IMPORT_UA,
-        CURLOPT_FAILONERROR => true,
-        CURLOPT_SSL_VERIFYPEER => true,
-      ]);
-      $ok = curl_exec($ch);
-      $err = curl_error($ch);
-      $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-      curl_close($ch); fclose($fp);
-      if (!$ok || $http >= 400) throw new RuntimeException("HTTP $http $err");
-      return filesize($dest);
+      $currentUrl = $url;
+      for ($hop = 0; $hop <= 5; $hop++) {
+        if (!kp_is_safe_remote_url($currentUrl)) {
+          throw new RuntimeException("URL remota no segura: $currentUrl");
+        }
+        $fp = fopen($dest, 'wb');
+        if (!$fp) throw new RuntimeException("No se pudo abrir destino $dest");
+        $redirectUrl = null;
+        $ch = curl_init($currentUrl);
+        curl_setopt_array($ch, [
+          CURLOPT_FILE => $fp,
+          CURLOPT_FOLLOWLOCATION => false,
+          CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+          CURLOPT_TIMEOUT => 0,
+          CURLOPT_CONNECTTIMEOUT => KP_IMPORT_TIMEOUT,
+          CURLOPT_USERAGENT => KP_IMPORT_UA,
+          CURLOPT_FAILONERROR => false,
+          CURLOPT_SSL_VERIFYPEER => true,
+          CURLOPT_HEADERFUNCTION => static function ($ch, $header) use (&$redirectUrl) {
+            if (preg_match('/^location:\s*(.+)$/i', trim($header), $m)) {
+              $redirectUrl = trim($m[1]);
+            }
+            return strlen($header);
+          },
+        ]);
+        $ok = curl_exec($ch);
+        $err = curl_error($ch);
+        $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch); fclose($fp);
+
+        if ($ok && $http >= 300 && $http < 400 && $redirectUrl) {
+          @unlink($dest);
+          if ($hop === 5) throw new RuntimeException("Demasiadas redirecciones");
+          $currentUrl = $redirectUrl;
+          continue;
+        }
+        if (!$ok || $http >= 400) throw new RuntimeException("HTTP $http $err");
+        return filesize($dest);
+      }
+      throw new RuntimeException("Demasiadas redirecciones");
     } catch (Throwable $e) {
       @unlink($dest);
       if ($i + 1 >= $retries) throw $e;
@@ -508,7 +532,10 @@ function kp_http_download(string $url, string $dest, int $retries = KP_IMPORT_RE
 function kp_download_with_retry(string $url, string $destDir, string $guid): array {
   if (!is_dir($destDir)) @mkdir($destDir, 0755, true);
   $ext = strtolower(pathinfo(parse_url($url, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
-  if (!$ext) $ext = str_contains($destDir, 'covers') ? 'jpg' : 'bin';
+  $allowedExts = ['mp3', 'm4a', 'ogg', 'opus', 'wav', 'flac', 'aac', 'jpg', 'jpeg', 'png', 'webp', 'gif', 'srt', 'vtt', 'txt', 'json'];
+  if (!$ext || !in_array($ext, $allowedExts, true)) {
+    $ext = str_contains($destDir, 'covers') ? 'jpg' : 'bin';
+  }
   $safe = preg_replace('/[^a-z0-9]+/i', '-', basename((string)parse_url($url, PHP_URL_PATH)));
   $name = substr(sha1($guid), 0, 8) . '-' . substr($safe, 0, 20) . '.' . $ext;
   $abs = "$destDir/$name";

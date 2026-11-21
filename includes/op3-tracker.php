@@ -145,14 +145,14 @@ function kp_op3_record_playback(int $epId, int $podId, int $secs, bool $isStart 
 
   $pdo = kp_db();
   try {
-    $exists = kp_one("SELECT 1 FROM op3_playback_daily WHERE date = ? AND episode_id = ?", [$date, $epId]);
-    if ($exists) {
-      $pdo->prepare("UPDATE op3_playback_daily SET play_count = play_count + ?, completed_count = completed_count + ?, total_secs = total_secs + ? WHERE date = ? AND episode_id = ?")
-          ->execute([$startInc, $compInc, $secs, $date, $epId]);
-    } else {
-      $pdo->prepare("INSERT INTO op3_playback_daily (date, episode_id, podcast_id, play_count, completed_count, total_secs) VALUES (?, ?, ?, ?, ?, ?)")
-          ->execute([$date, $epId, $podId, $startInc, $compInc, $secs]);
-    }
+    $pdo->prepare("
+      INSERT INTO op3_playback_daily (date, episode_id, podcast_id, play_count, completed_count, total_secs)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(date, episode_id) DO UPDATE SET
+        play_count = op3_playback_daily.play_count + excluded.play_count,
+        completed_count = op3_playback_daily.completed_count + excluded.completed_count,
+        total_secs = op3_playback_daily.total_secs + excluded.total_secs
+    ")->execute([$date, $epId, $podId, $startInc, $compInc, $secs]);
   } catch (Throwable $e) {
     error_log('[OP3 playback] ' . $e->getMessage());
   }
@@ -274,13 +274,34 @@ function kp_op3_resolve_geo(): array {
   ];
   if ($cf['country']) return $cf;
 
-  // 2) MaxMind GeoLite2
+  // 2) MaxMind GeoLite2 (instancias Reader cacheadas en static)
+  static $cityReader = null;
+  static $asnReader = null;
+  static $cityFailed = false;
+  static $asnFailed = false;
+
   $mmdb = __DIR__ . '/../storage/geoip/GeoLite2-City.mmdb';
   $asnDb = __DIR__ . '/../storage/geoip/GeoLite2-ASN.mmdb';
-  if (file_exists($mmdb) && class_exists('GeoIp2\\Database\\Reader')) {
+
+  if ($cityReader === null && !$cityFailed && file_exists($mmdb) && class_exists('GeoIp2\\Database\\Reader')) {
     try {
-      $reader = new GeoIp2\Database\Reader($mmdb);
-      $r = $reader->city(kp_op3_real_ip());
+      $cityReader = new GeoIp2\Database\Reader($mmdb);
+    } catch (Throwable $e) {
+      $cityFailed = true;
+    }
+  }
+  if ($asnReader === null && !$asnFailed && file_exists($asnDb) && class_exists('GeoIp2\\Database\\Reader')) {
+    try {
+      $asnReader = new GeoIp2\Database\Reader($asnDb);
+    } catch (Throwable $e) {
+      $asnFailed = true;
+    }
+  }
+
+  if ($cityReader !== null) {
+    try {
+      $ip = kp_op3_real_ip();
+      $r = $cityReader->city($ip);
       $out = [
         'country'     => $r->country->isoCode ?? '',
         'region'      => $r->mostSpecificSubdivision->isoCode ?? '',
@@ -290,9 +311,9 @@ function kp_op3_resolve_geo(): array {
         'asn'         => '',
         'continent'   => $r->continent->code ?? '',
       ];
-      if (file_exists($asnDb)) {
+      if ($asnReader !== null) {
         try {
-          $asn = (new GeoIp2\Database\Reader($asnDb))->asn(kp_op3_real_ip());
+          $asn = $asnReader->asn($ip);
           $out['asn'] = (string)($asn->autonomousSystemNumber ?? '');
         } catch (Throwable $e) {}
       }

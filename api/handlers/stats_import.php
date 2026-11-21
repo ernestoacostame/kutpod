@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/op3-importer.php';
 
 // 1. Autenticación: verificar sesión por cookie web o Bearer token
 $user = kp_current_user();
+$viaCookie = (bool)$user;
 if (!$user) {
     $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
     if (!$auth_header && function_exists('getallheaders')) {
@@ -30,6 +31,10 @@ if (!$user) {
     api_error(401, 'unauthorized', 'Usuario no autenticado');
 }
 
+if ($viaCookie) {
+    kp_csrf_verify();
+}
+
 $role = $user['role'] ?? 'author';
 if (!in_array($role, ['owner', 'admin', 'editor'], true)) {
     api_error(403, 'forbidden', 'No tienes permisos para importar métricas');
@@ -39,6 +44,9 @@ if (!in_array($role, ['owner', 'admin', 'editor'], true)) {
 $podcastId = (int)($_POST['podcast_id'] ?? 0);
 $platform  = trim((string)($_POST['platform'] ?? 'auto'));
 $redirect  = trim((string)($_POST['redirect'] ?? ''));
+if ($redirect !== '' && (!str_starts_with($redirect, '/') || str_starts_with($redirect, '//'))) {
+    $redirect = '';
+}
 
 $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest')
     || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))
@@ -96,21 +104,35 @@ foreach ($uploaded as $item) {
     if ($ext === 'zip' && class_exists('ZipArchive')) {
         $zip = new ZipArchive();
         if ($zip->open($item['tmp_name']) === true) {
-            $extractPath = sys_get_temp_dir() . '/kp_zip_' . uniqid('', true);
-            mkdir($extractPath, 0755, true);
-            $tempDirs[] = $extractPath;
-            $zip->extractTo($extractPath);
+            $zipSafe = true;
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $entry = $zip->getNameIndex($i);
+                $stat = $zip->statIndex($i);
+                $isSymlink = $stat && ((($stat['external_attributes'] >> 16) & 0170000) === 0120000);
+                if ($entry === false || $isSymlink || str_contains($entry, '..') || str_starts_with($entry, '/') || str_contains($entry, '\\') || str_contains($entry, "\0")) {
+                    $zipSafe = false;
+                    break;
+                }
+            }
+            if ($zipSafe) {
+                $extractPath = sys_get_temp_dir() . '/kp_zip_' . uniqid('', true);
+                mkdir($extractPath, 0755, true);
+                $tempDirs[] = $extractPath;
+                $zip->extractTo($extractPath);
+            }
             $zip->close();
 
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($extractPath, FilesystemIterator::SKIP_DOTS)
-            );
-            foreach ($iterator as $fItem) {
-                if ($fItem->isFile() && strtolower($fItem->getExtension()) === 'csv') {
-                    $csvQueue[] = [
-                        'name'     => $fItem->getBasename(),
-                        'tmp_name' => $fItem->getPathname(),
-                    ];
+            if ($zipSafe) {
+                $iterator = new RecursiveIteratorIterator(
+                    new RecursiveDirectoryIterator($extractPath, FilesystemIterator::SKIP_DOTS)
+                );
+                foreach ($iterator as $fItem) {
+                    if ($fItem->isFile() && strtolower($fItem->getExtension()) === 'csv') {
+                        $csvQueue[] = [
+                            'name'     => $fItem->getBasename(),
+                            'tmp_name' => $fItem->getPathname(),
+                        ];
+                    }
                 }
             }
         }

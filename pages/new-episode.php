@@ -15,6 +15,11 @@ $p = kp_find_podcast($pid) ?? kp_podcasts()[0];
 // Fetch numeric podcast ID
 $real_podcast_id = kp_one("SELECT id FROM podcasts WHERE slug = ?", [$p['id']])['id'] ?? null;
 
+if (!$real_podcast_id || !kp_can_edit_podcast((int)$real_podcast_id)) {
+    http_response_code(403);
+    exit('403 · Acceso denegado');
+}
+
 $ep = null;
 if ($ep_id && $real_podcast_id) {
     $ep = kp_one("SELECT * FROM episodes WHERE (slug = ? OR id = ?) AND podcast_id = ?", [$ep_id, $ep_id, $real_podcast_id]);
@@ -72,25 +77,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
   }
 
+  $detectMime = static function (string $tmpPath): string {
+      if (function_exists('finfo_open')) {
+          $finfo = @finfo_open(FILEINFO_MIME_TYPE);
+          if ($finfo) {
+              $mime = (string)@finfo_file($finfo, $tmpPath);
+              @finfo_close($finfo);
+              return strtolower(trim($mime));
+          }
+      }
+      return '';
+  };
+
   // Handle transcript upload
   $transcript_url = $ep['transcript_url'] ?? '';
   if (!empty($_FILES['transcript']) && $_FILES['transcript']['error'] === UPLOAD_ERR_OK) {
-      $ext = strtolower(pathinfo($_FILES['transcript']['name'], PATHINFO_EXTENSION) ?: 'srt');
-      $dest = __DIR__ . '/../media/uploads/' . $slug . '.' . $ext;
-      @mkdir(dirname($dest), 0775, true);
-      if (move_uploaded_file($_FILES['transcript']['tmp_name'], $dest)) {
-          $transcript_url = '/media/uploads/' . $slug . '.' . $ext;
+      $ext = strtolower(pathinfo($_FILES['transcript']['name'], PATHINFO_EXTENSION));
+      $mime = $detectMime($_FILES['transcript']['tmp_name']);
+      $allowedTranscriptExts = ['srt', 'vtt', 'txt'];
+      $allowedTranscriptMimes = ['text/plain', 'text/vtt', 'text/srt', 'application/x-subrip', ''];
+      if (in_array($ext, $allowedTranscriptExts, true) && in_array($mime, $allowedTranscriptMimes, true)) {
+          $dest = __DIR__ . '/../media/uploads/' . $slug . '.' . $ext;
+          @mkdir(dirname($dest), 0775, true);
+          if (move_uploaded_file($_FILES['transcript']['tmp_name'], $dest)) {
+              $transcript_url = '/media/uploads/' . $slug . '.' . $ext;
+          }
       }
   }
 
   // Handle manual chapters upload
   $chapters_url = $ep['chapters_url'] ?? '';
   if (!empty($_FILES['chapters']) && $_FILES['chapters']['error'] === UPLOAD_ERR_OK) {
-      $ext = strtolower(pathinfo($_FILES['chapters']['name'], PATHINFO_EXTENSION) ?: 'json');
-      $dest = __DIR__ . '/../media/chapters/' . $p['id'] . '/ep_' . $slug . '.' . $ext;
-      @mkdir(dirname($dest), 0775, true);
-      if (move_uploaded_file($_FILES['chapters']['tmp_name'], $dest)) {
-          $chapters_url = '/media/chapters/' . $p['id'] . '/ep_' . $slug . '.' . $ext;
+      $ext = strtolower(pathinfo($_FILES['chapters']['name'], PATHINFO_EXTENSION));
+      $mime = $detectMime($_FILES['chapters']['tmp_name']);
+      $allowedChaptersMimes = ['application/json', 'text/plain', ''];
+      if ($ext === 'json' && in_array($mime, $allowedChaptersMimes, true)) {
+          $dest = __DIR__ . '/../media/chapters/' . $p['id'] . '/ep_' . $slug . '.json';
+          @mkdir(dirname($dest), 0775, true);
+          if (move_uploaded_file($_FILES['chapters']['tmp_name'], $dest)) {
+              $chapters_url = '/media/chapters/' . $p['id'] . '/ep_' . $slug . '.json';
+          }
       }
   }
 
@@ -101,10 +127,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $client_duration = (int)($_POST['client_duration'] ?? 0);
 
   if (!empty($_FILES['audio']) && $_FILES['audio']['error'] === UPLOAD_ERR_OK) {
-      $ext = strtolower(pathinfo($_FILES['audio']['name'], PATHINFO_EXTENSION) ?: 'mp3');
-      $dest = __DIR__ . '/../media/audio/' . $p['id'] . '/' . $slug . '.' . $ext;
-      @mkdir(dirname($dest), 0775, true);
-      if (move_uploaded_file($_FILES['audio']['tmp_name'], $dest)) {
+      $ext = strtolower(pathinfo($_FILES['audio']['name'], PATHINFO_EXTENSION));
+      $mime = $detectMime($_FILES['audio']['tmp_name']);
+      $allowedAudioExts = ['mp3', 'm4a', 'ogg', 'opus', 'wav', 'flac', 'aac'];
+      $allowedAudioMimes = [
+          'audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/m4a',
+          'audio/ogg', 'application/ogg', 'audio/opus', 'audio/wav', 'audio/x-wav',
+          'audio/flac', 'audio/x-flac', 'audio/aac', 'audio/x-aac', 'video/mp4', ''
+      ];
+      if (in_array($ext, $allowedAudioExts, true) && in_array($mime, $allowedAudioMimes, true)) {
+          $dest = __DIR__ . '/../media/audio/' . $p['id'] . '/' . $slug . '.' . $ext;
+          @mkdir(dirname($dest), 0775, true);
+          if (move_uploaded_file($_FILES['audio']['tmp_name'], $dest)) {
           // Si el archivo es webm, mp4, ogg, o m4a (grabación directa del navegador), convertirlo a mp3 para compatibilidad
           if (in_array($ext, ['webm', 'mp4', 'ogg', 'm4a']) && $has_ffmpeg) {
               $mp3Dest = __DIR__ . '/../media/audio/' . $p['id'] . '/' . $slug . '.mp3';
@@ -158,6 +192,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
           if ($duration_secs <= 0) {
               $duration_secs = kp_extract_audio_duration($dest);
+          }
           }
       }
   }

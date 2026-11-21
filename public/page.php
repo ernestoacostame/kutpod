@@ -46,8 +46,22 @@ $og_description = mb_strimwidth(trim(strip_tags($pg['content_md'] ?? '')), 0, 20
         $h = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $h);
         $h = preg_replace('/\*(.+?)\*/', '<em>$1</em>', $h);
         $h = preg_replace('/`([^`]+)`/', '<code>$1</code>', $h);
-        $h = preg_replace('/!\[(.*?)\]\((.*?)\)/', '<figure><img src="$2" alt="$1" style="max-width:100%;border-radius:8px"></figure>', $h);
-        $h = preg_replace('/\[(.+?)\]\((.+?)\)/', '<a href="$2" target="_blank">$1</a>', $h);
+        $h = preg_replace_callback('/!\[(.*?)\]\((.+?)\)/', static function ($m) {
+          $alt = $m[1];
+          $src = trim($m[2]);
+          if (!preg_match('#^(https?://|/[^/])#i', $src)) {
+            return $alt;
+          }
+          return '<figure><img src="' . $src . '" alt="' . $alt . '" style="max-width:100%;border-radius:8px"></figure>';
+        }, $h);
+        $h = preg_replace_callback('/\[(.+?)\]\((.+?)\)/', static function ($m) {
+          $text = $m[1];
+          $url = trim($m[2]);
+          if (!preg_match('#^(https?://|/[^/])#i', $url)) {
+            return $text;
+          }
+          return '<a href="' . $url . '" target="_blank" rel="noopener">' . $text . '</a>';
+        }, $h);
         $h = preg_replace('/^&gt; (.+)$/m', '<blockquote>$1</blockquote>', $h);
         $h = preg_replace('/^- (.+)$/m', '<li>$1</li>', $h);
         $h = preg_replace('/(<li>.*<\/li>)/s', '<ul>$1</ul>', $h);

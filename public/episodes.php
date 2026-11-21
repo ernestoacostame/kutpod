@@ -1,8 +1,9 @@
 <?php
 require_once __DIR__ . '/../includes/helpers.php';
-$eps = kp_episodes();
+$isJsonRequest = isset($_GET['json']) || (isset($_GET['format']) && $_GET['format'] === 'json') || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'));
 
-if (isset($_GET['json']) || (isset($_GET['format']) && $_GET['format'] === 'json') || (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json'))) {
+if ($isJsonRequest) {
+    $eps = kp_episodes();
     header('Content-Type: application/json; charset=utf-8');
     $q = trim(mb_strtolower($_GET['q'] ?? '', 'UTF-8'));
     $tag = trim(mb_strtolower($_GET['tag'] ?? '', 'UTF-8'));
@@ -44,9 +45,11 @@ if (isset($_GET['json']) || (isset($_GET['format']) && $_GET['format'] === 'json
 
 $pageEp = max(1, (int)($_GET['p'] ?? 1));
 $perPage = 24; // Múltiplo de 2 o 3, mejor 24
-$totalEpsCount = count($eps);
+$now_utc = gmdate('Y-m-d H:i:s');
+$cntRow = kp_one("SELECT COUNT(*) AS c FROM episodes WHERE hidden = 0 AND (status = 'published' OR (status = 'scheduled' AND COALESCE(published_at, publish_at, created_at) <= ?))", [$now_utc]);
+$totalEpsCount = (int)($cntRow['c'] ?? 0);
 $totalPages = max(1, ceil($totalEpsCount / $perPage));
-$epsPage = array_slice($eps, ($pageEp - 1) * $perPage, $perPage);
+$epsPage = kp_episodes(false, null, $perPage, ($pageEp - 1) * $perPage);
 
 function pub_play_btn(array $ep, array $p, int $size = 14): string {
   $src = '/r/' . urlencode($p['id']) . '/' . urlencode($ep['id']) . '/audio.mp3';

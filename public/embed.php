@@ -19,27 +19,30 @@ $idParam = (int)($_GET['id'] ?? 0);
 $ep = null;
 $p = null;
 
+$epCols = "id, podcast_id, slug, title, cover, duration_secs";
+$podCols = "id, slug, title, cover, color";
+
 if ($idParam > 0) {
-    $ep = kp_one("SELECT * FROM episodes WHERE id = ? AND status = 'published'", [$idParam]);
+    $ep = kp_one("SELECT $epCols FROM episodes WHERE id = ? AND status = 'published'", [$idParam]);
     if ($ep) {
-        $p = kp_one("SELECT * FROM podcasts WHERE id = ?", [$ep['podcast_id']]);
+        $p = kp_one("SELECT $podCols FROM podcasts WHERE id = ?", [$ep['podcast_id']]);
     }
 } elseif ($showParam && $epParam) {
-    $p = kp_one("SELECT * FROM podcasts WHERE slug = ?", [$showParam]);
+    $p = kp_one("SELECT $podCols FROM podcasts WHERE slug = ?", [$showParam]);
     if ($p) {
-        $ep = kp_one("SELECT * FROM episodes WHERE podcast_id = ? AND slug = ? AND status = 'published'", [$p['id'], $epParam]);
+        $ep = kp_one("SELECT $epCols FROM episodes WHERE podcast_id = ? AND slug = ? AND status = 'published'", [$p['id'], $epParam]);
     }
     // Fallback: si por alguna razón no coincidió con ese podcast, buscar directamente por slug del episodio
     if (!$ep) {
-        $ep = kp_one("SELECT * FROM episodes WHERE slug = ? AND status = 'published'", [$epParam]);
+        $ep = kp_one("SELECT $epCols FROM episodes WHERE slug = ? AND status = 'published'", [$epParam]);
         if ($ep) {
-            $p = kp_one("SELECT * FROM podcasts WHERE id = ?", [$ep['podcast_id']]);
+            $p = kp_one("SELECT $podCols FROM podcasts WHERE id = ?", [$ep['podcast_id']]);
         }
     }
 } elseif ($epParam) {
-    $ep = kp_one("SELECT * FROM episodes WHERE slug = ? AND status = 'published'", [$epParam]);
+    $ep = kp_one("SELECT $epCols FROM episodes WHERE slug = ? AND status = 'published'", [$epParam]);
     if ($ep) {
-        $p = kp_one("SELECT * FROM podcasts WHERE id = ?", [$ep['podcast_id']]);
+        $p = kp_one("SELECT $podCols FROM podcasts WHERE id = ?", [$ep['podcast_id']]);
     }
 }
 

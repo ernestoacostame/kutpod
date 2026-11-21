@@ -352,24 +352,9 @@ function kp_ap_inbox(string $slug): void {
   $sigVerified = kp_ap_verify_signature($raw);
   if (!$sigVerified) {
     $actorUrl = is_array($a['actor'] ?? null) ? ($a['actor']['id'] ?? '') : ($a['actor'] ?? '');
-    kp_ap_log("Aviso: Firma HTTP no verificada para '$slug'. Tipo: " . ($a['type'] ?? '') . " | Actor: " . $actorUrl);
-    
-    // Si la firma falla, validar que el actor sea una URL válida
-    if (empty($actorUrl) || !filter_var($actorUrl, FILTER_VALIDATE_URL)) {
-      if ($a['type'] === 'Delete') {
-        $obj = is_array($a['object'] ?? null) ? ($a['object']['id'] ?? '') : ($a['object'] ?? '');
-        if ($actorUrl && $obj === $actorUrl) {
-          $actorObj = kp_ap_fetch_actor($actorUrl);
-          if ($actorObj === null || empty($actorObj['publicKey']) || ($actorObj['type'] ?? '') === 'Tombstone') {
-            kp_db()->prepare("DELETE FROM ap_followers WHERE actor_url = ?")->execute([$actorUrl]);
-            http_response_code(202);
-            exit;
-          }
-        }
-      }
-      http_response_code(401);
-      exit('signature invalid');
-    }
+    kp_ap_log("Firma HTTP inválida o ausente para '$slug'. Tipo: " . ($a['type'] ?? '') . " | Actor: " . $actorUrl);
+    http_response_code(401);
+    exit('signature invalid');
   }
 
   switch ($a['type']) {
@@ -728,6 +713,32 @@ function kp_ap_inbox_is_dead(string $inbox): bool {
 // Worker de entrega · drena ap_delivery con backoff exponencial
 // Invocar desde cron: php cli/ap-deliver.php
 // ---------------------------------------------------------------------------
+function kp_ap_mark_delivery_failure(array $d, ?int $podcastId, string $errMsg, int $httpCode = 0): void {
+  $attempts = (int)$d['attempts'] + 1;
+  $isGone = ($httpCode === 410); // 404 puede ser transitorio (ruta/servidor en mantenimiento)
+
+  if ($isGone) {
+    $msg = "HTTP $httpCode: Seguidor o inbox ya no existe. Eliminado de seguidores.";
+    kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, status='failed' WHERE id = ?")
+          ->execute([$attempts, $msg, $d['id']]);
+    kp_ap_remove_follower_by_inbox($d['inbox'], "HTTP $httpCode (Gone)", ($podcastId ?: null));
+  } elseif ($attempts >= 6) {
+    $msg = "Agotados intentos máximos ($attempts): " . $errMsg;
+    kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, status='failed' WHERE id = ?")
+          ->execute([$attempts, $msg, $d['id']]);
+    if (kp_ap_inbox_is_dead($d['inbox'])) {
+      kp_ap_remove_follower_by_inbox($d['inbox'], "Inbox sin entregas correctas en 14 días ($attempts intentos en este envío)", ($podcastId ?: null));
+    } else {
+      kp_ap_log("Entrega fallida tras $attempts intentos a {$d['inbox']}; se CONSERVA el seguidor (fallo posiblemente transitorio).");
+    }
+  } else {
+    $backoff = min(86400, pow(2, $attempts) * 60); // hasta 1 día
+    $next = gmdate('Y-m-d H:i:s', time() + $backoff);
+    kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, next_try=?, status='pending' WHERE id = ?")
+          ->execute([$attempts, $errMsg, $next, $d['id']]);
+  }
+}
+
 function kp_ap_deliver_pending(int $batch = 50): int {
   @set_time_limit(0);
   @ignore_user_abort(true);
@@ -735,69 +746,117 @@ function kp_ap_deliver_pending(int $batch = 50): int {
   $rows = kp_q("SELECT * FROM ap_delivery 
                 WHERE status = 'pending' AND next_try <= datetime('now', '+1 minute')
                 ORDER BY id LIMIT ?", [$batch]);
+  if (!$rows) return 0;
+
   $sent = 0;
+  $queue = [];
+  $blockedCache = [];
+
   foreach ($rows as $d) {
-    try {
-      $outbox = kp_one("SELECT podcast_id, object_json FROM ap_outbox WHERE id = ?", [$d['outbox_id']]);
-      if (!$outbox) {
-          kp_db()->prepare("UPDATE ap_delivery SET status='failed', last_error='Outbox item missing' WHERE id = ?")->execute([$d['id']]);
-          continue;
+    $outbox = kp_one("SELECT podcast_id, object_json FROM ap_outbox WHERE id = ?", [$d['outbox_id']]);
+    if (!$outbox) {
+      kp_db()->prepare("UPDATE ap_delivery SET status='failed', last_error='Outbox item missing' WHERE id = ?")->execute([$d['id']]);
+      continue;
+    }
+
+    // Descartar de inmediato si el dominio destino está en la lista de bloqueados
+    $host = strtolower(parse_url($d['inbox'], PHP_URL_HOST) ?? '');
+    if ($host) {
+      if (!array_key_exists($host, $blockedCache)) {
+        $blockedCache[$host] = (bool)kp_one("SELECT domain FROM fediverse_blocks WHERE LOWER(domain) = ? LIMIT 1", [$host]);
       }
-
-      // Descartar de inmediato si el dominio destino está en la lista de bloqueados
-      $host = strtolower(parse_url($d['inbox'], PHP_URL_HOST) ?? '');
-      if ($host) {
-        $isBlocked = kp_one("SELECT domain FROM fediverse_blocks WHERE LOWER(domain) = ? LIMIT 1", [$host]);
-        if ($isBlocked) {
-          kp_db()->prepare("UPDATE ap_delivery SET status='failed', last_error='Dominio bloqueado' WHERE id = ?")->execute([$d['id']]);
-          kp_ap_remove_follower_by_inbox($d['inbox'], "Dominio bloqueado: $host");
-          continue;
-        }
-      }
-
-      kp_ap_post_signed($d['inbox'], $outbox['object_json'], (int)$outbox['podcast_id']);
-      kp_db()->prepare("UPDATE ap_delivery SET status='delivered', delivered_at=datetime('now') WHERE id = ?")
-            ->execute([$d['id']]);
-      $sent++;
-    } catch (Throwable $e) {
-      $attempts = $d['attempts'] + 1;
-      $httpCode = (int)$e->getCode();
-      $isGone = ($httpCode === 410); // 404 puede ser transitorio (ruta/servidor en mantenimiento)
-
-      // Si el servidor remoto indica que el recurso ya no existe (410 Gone / 404 Not Found)
-      // o si se alcanzaron 6 intentos fallidos consecutivos:
-      if ($isGone) {
-        $msg = "HTTP $httpCode: Seguidor o inbox ya no existe. Eliminado de seguidores.";
-        kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, status='failed' WHERE id = ?")
-              ->execute([$attempts, $msg, $d['id']]);
-        kp_ap_remove_follower_by_inbox($d['inbox'], "HTTP $httpCode (Gone)", (int)($outbox['podcast_id'] ?? 0) ?: null);
-      } elseif ($attempts >= 6) {
-        $msg = "Agotados intentos máximos ($attempts): " . $e->getMessage();
-        kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, status='failed' WHERE id = ?")
-              ->execute([$attempts, $msg, $d['id']]);
-        if (kp_ap_inbox_is_dead($d['inbox'])) {
-          kp_ap_remove_follower_by_inbox($d['inbox'], "Inbox sin entregas correctas en 14 días ($attempts intentos en este envío)", (int)($outbox['podcast_id'] ?? 0) ?: null);
-        } else {
-          kp_ap_log("Entrega fallida tras $attempts intentos a {$d['inbox']}; se CONSERVA el seguidor (fallo posiblemente transitorio).");
-        }
-      } else {
-        $backoff = min(86400, pow(2, $attempts) * 60); // hasta 1 día
-        $next = gmdate('Y-m-d H:i:s', time() + $backoff);
-        kp_db()->prepare("UPDATE ap_delivery SET attempts=?, last_error=?, next_try=?, status='pending' WHERE id = ?")
-              ->execute([$attempts, $e->getMessage(), $next, $d['id']]);
+      if ($blockedCache[$host]) {
+        kp_db()->prepare("UPDATE ap_delivery SET status='failed', last_error='Dominio bloqueado' WHERE id = ?")->execute([$d['id']]);
+        kp_ap_remove_follower_by_inbox($d['inbox'], "Dominio bloqueado: $host");
+        continue;
       }
     }
+
+    $queue[] = [
+      'delivery'   => $d,
+      'podcast_id' => (int)$outbox['podcast_id'],
+      'body'       => (string)$outbox['object_json'],
+    ];
   }
+
+  if (!$queue) return 0;
+
+  foreach (array_chunk($queue, 12) as $chunk) {
+    $mh = curl_multi_init();
+    $handles = [];
+
+    foreach ($chunk as $idx => $item) {
+      $d = $item['delivery'];
+      try {
+        $ch = kp_ap_build_signed_curl($d['inbox'], $item['body'], $item['podcast_id']);
+        curl_multi_add_handle($mh, $ch);
+        $handles[$idx] = ['ch' => $ch, 'item' => $item];
+      } catch (Throwable $e) {
+        kp_ap_mark_delivery_failure($d, $item['podcast_id'], $e->getMessage(), (int)$e->getCode());
+      }
+    }
+
+    if ($handles) {
+      $running = null;
+      do {
+        $status = curl_multi_exec($mh, $running);
+        if ($running && $status === CURLM_OK) {
+          curl_multi_select($mh, 0.2);
+        }
+      } while ($running > 0 && $status === CURLM_OK);
+
+      foreach ($handles as $entry) {
+        $ch = $entry['ch'];
+        $item = $entry['item'];
+        $d = $item['delivery'];
+        $resp = curl_multi_getcontent($ch);
+        $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_multi_remove_handle($mh, $ch);
+        curl_close($ch);
+
+        if ($http >= 400 || $resp === false || $err !== '') {
+          $errDetail = $err ? "curl error: $err" : "HTTP $http " . substr((string)$resp, 0, 150);
+          kp_ap_log("Entrega fallida a {$d['inbox']}: $errDetail");
+          kp_ap_mark_delivery_failure($d, $item['podcast_id'], $errDetail, $http ?: 500);
+        } else {
+          kp_ap_log("Entrega exitosa a {$d['inbox']}: HTTP $http");
+          kp_db()->prepare("UPDATE ap_delivery SET status='delivered', delivered_at=datetime('now') WHERE id = ?")
+                ->execute([$d['id']]);
+          $sent++;
+        }
+      }
+    }
+
+    curl_multi_close($mh);
+  }
+
   return $sent;
 }
 
 // ---------------------------------------------------------------------------
 // HTTP Signatures (draft-cavage-12) · entregar firmado
 // ---------------------------------------------------------------------------
-function kp_ap_post_signed(string $url, string $body, int $podcastId): void {
+function kp_ap_build_signed_curl(string $url, string $body, int $podcastId) {
+  static $slugCache = [];
+  static $keyCache = [];
+
+  if (!function_exists('kp_is_safe_remote_url')) {
+    require_once __DIR__ . '/includes/helpers.php';
+  }
+  if (!kp_is_safe_remote_url($url)) {
+    kp_ap_log("Entrega bloqueada (URL no segura): $url");
+    throw new RuntimeException("URL remota no segura: $url");
+  }
   kp_ap_log("Entrega: Intentando enviar POST firmado a $url");
-  $p = kp_one("SELECT slug FROM podcasts WHERE id = ?", [$podcastId]);
-  $kp = kp_ap_keypair($podcastId);
+  if (!isset($slugCache[$podcastId])) {
+    $slugCache[$podcastId] = kp_one("SELECT slug FROM podcasts WHERE id = ?", [$podcastId]);
+  }
+  if (!isset($keyCache[$podcastId])) {
+    $keyCache[$podcastId] = kp_ap_keypair($podcastId);
+  }
+  $p = $slugCache[$podcastId];
+  $kp = $keyCache[$podcastId];
   $u = parse_url($url);
   $date = gmdate('D, d M Y H:i:s') . ' GMT';
   $digest = 'SHA-256=' . base64_encode(hash('sha256', $body, true));
@@ -827,8 +886,15 @@ function kp_ap_post_signed(string $url, string $body, int $podcastId): void {
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_CONNECTTIMEOUT => 5,
     CURLOPT_TIMEOUT => 12,
+    CURLOPT_FOLLOWLOCATION => false,
+    CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
     CURLOPT_FAILONERROR => false,
   ]);
+  return $ch;
+}
+
+function kp_ap_post_signed(string $url, string $body, int $podcastId): void {
+  $ch = kp_ap_build_signed_curl($url, $body, $podcastId);
   $resp = curl_exec($ch);
   $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
   $err = curl_error($ch);
@@ -870,11 +936,56 @@ function kp_ap_verify_signature(string $body): bool {
     kp_ap_log("Firma fallida: Componentes incompletos en cabecera: " . $sig);
     return false;
   }
-  
+
+  // Verificar cabecera Digest (obligatoria en POST al inbox, y verificada siempre que esté presente)
+  $digestHeader = $_SERVER['HTTP_DIGEST'] ?? '';
+  if (!$digestHeader && function_exists('getallheaders')) {
+    foreach (getallheaders() as $k => $v) {
+      if (strtolower($k) === 'digest') {
+        $digestHeader = $v;
+        break;
+      }
+    }
+  }
+  $isPost = strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST';
+  if ($isPost && $digestHeader === '') {
+    kp_ap_log("Firma fallida: Cabecera 'Digest' obligatoria ausente en POST");
+    return false;
+  }
+  if ($digestHeader !== '') {
+    $expectedDigestB64 = base64_encode(hash('sha256', $body, true));
+    $digestValid = false;
+    if (preg_match('/^SHA-256=([A-Za-z0-9+\/=]+)$/i', trim($digestHeader), $dm)) {
+      $digestValid = hash_equals($expectedDigestB64, $dm[1]);
+    }
+    if (!$digestValid) {
+      kp_ap_log("Firma fallida: Digest SHA-256 no coincide con el cuerpo de la petición");
+      return false;
+    }
+  }
+
+  $activity = json_decode($body, true);
+  $activityActor = '';
+  if (is_array($activity)) {
+    $activityActor = is_array($activity['actor'] ?? null) ? (string)($activity['actor']['id'] ?? '') : (string)($activity['actor'] ?? '');
+  }
+  $keyIdHost = strtolower((string)parse_url($parts['keyId'], PHP_URL_HOST));
+  $actorHost = strtolower((string)parse_url($activityActor, PHP_URL_HOST));
+  if ($activityActor !== '' && ($keyIdHost === '' || $actorHost === '' || $keyIdHost !== $actorHost)) {
+    kp_ap_log("Firma fallida: Host de keyId ($keyIdHost) no coincide con el host del actor ($actorHost)");
+    return false;
+  }
+
   $actorUrl = preg_replace('/#.*/', '', $parts['keyId']);
   $actor = kp_ap_fetch_actor($actorUrl);
   if (empty($actor)) {
     kp_ap_log("Firma fallida: No se pudo obtener el actor desde $actorUrl");
+    return false;
+  }
+
+  $fetchedKeyId = (string)($actor['publicKey']['id'] ?? '');
+  if ($fetchedKeyId !== '' && $fetchedKeyId !== $parts['keyId']) {
+    kp_ap_log("Firma fallida: keyId ({$parts['keyId']}) no pertenece a publicKey.id del actor ($fetchedKeyId)");
     return false;
   }
   
@@ -929,12 +1040,27 @@ function kp_ap_verify_signature(string $body): bool {
 }
 
 function kp_ap_fetch_actor(string $url): ?array {
-  if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) return null;
+  static $memCache = [];
+  if (!function_exists('kp_is_safe_remote_url')) {
+    require_once __DIR__ . '/includes/helpers.php';
+  }
+  if (!kp_is_safe_remote_url($url)) return null;
+  if (isset($memCache[$url])) return $memCache[$url];
+
+  if (!function_exists('kp_cache_get')) {
+    require_once __DIR__ . '/includes/cache.php';
+  }
+  $cacheKey = 'ap_actor_' . md5($url);
+  $cached = kp_cache_get($cacheKey);
+  if (is_array($cached)) {
+    return $memCache[$url] = $cached;
+  }
+
   $ch = curl_init($url);
   curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_FOLLOWLOCATION => true,
-    CURLOPT_MAXREDIRS => 5,
+    CURLOPT_FOLLOWLOCATION => false,
+    CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
     CURLOPT_HTTPHEADER => [
       'Accept: application/activity+json, application/ld+json; profile="https://www.w3.org/ns/activitystreams"'
     ],
@@ -942,7 +1068,13 @@ function kp_ap_fetch_actor(string $url): ?array {
     CURLOPT_TIMEOUT => 10,
   ]);
   $r = curl_exec($ch); curl_close($ch);
-  return $r ? json_decode($r, true) : null;
+  $actor = $r ? json_decode($r, true) : null;
+  if (is_array($actor)) {
+    kp_cache_set($cacheKey, $actor, 3600);
+    $memCache[$url] = $actor;
+    return $actor;
+  }
+  return null;
 }
 
 function kp_ap_resolve_webfinger(string $acct): ?array {

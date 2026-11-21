@@ -59,6 +59,15 @@ if (!$is_valid) {
     api_error(401, 'invalid_credentials', 'Usuario o contraseña incorrectos');
 }
 
+if (!empty($row['totp_secret'])) {
+    $totpCode = trim((string)($body['totp_code'] ?? ''));
+    if ($totpCode === '' || !kp_totp_verify($row['totp_secret'], $totpCode)) {
+        kp_login_record_failure($ip);
+        kp_alert('security', 'Login API 2FA fallido', "Código TOTP inválido o faltante en acceso API para '$user' desde $ip.", '', ['actor_name' => $user]);
+        api_error(401, 'totp_required', 'Se requiere un código 2FA (totp_code) válido');
+    }
+}
+
 // Rehash si el algoritmo ha cambiado (solo si se usó la contraseña maestra)
 if (!$used_token && password_needs_rehash($row['password_hash'], PASSWORD_BCRYPT)) {
     $up = $pdo->prepare("UPDATE users SET password_hash = :h WHERE id = :id");

@@ -8,6 +8,9 @@ if (!defined('KUTPOD_VERSION')) {
     exit;
 }
 
+require_once __DIR__ . '/../includes/auth.php';
+kp_require_role('owner', 'admin');
+
 $pluginsDir = __DIR__ . '/../plugins';
 if (!is_dir($pluginsDir)) {
     @mkdir($pluginsDir, 0755, true);
@@ -144,10 +147,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $has_json = false;
         $invalid_path = false;
 
-        // Validar seguridad del ZIP (Prevenir Path Traversal)
+        // Validar seguridad del ZIP (Prevenir Path Traversal / Zip Slip)
         for ($i = 0; $i < $zip->numFiles; $i++) {
             $name = $zip->getNameIndex($i);
-            if (strpos($name, '../') !== false || strpos($name, '..\\') !== false) {
+            $stat = $zip->statIndex($i);
+            $isSymlink = $stat && ((($stat['external_attributes'] >> 16) & 0170000) === 0120000);
+            if ($name === false || $isSymlink || str_contains($name, '..') || str_starts_with($name, '/') || str_contains($name, '\\') || str_contains($name, "\0")) {
                 $invalid_path = true;
                 break;
             }

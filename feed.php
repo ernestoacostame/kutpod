@@ -102,33 +102,43 @@ if (!empty($latest_ep['max_date'])) {
     if ($ep_ts > $latest_ts) $latest_ts = $ep_ts;
 }
 
-function send_rss_response(string $xml, int $last_modified_ts): void {
-    $etag = '"' . md5($xml) . '"';
+$tokenStr = trim($_GET['token'] ?? '');
+$etag = '"' . md5($p['id'] . '|' . $latest_ts . '|' . ($p['updated_at'] ?? '') . '|' . $tokenStr) . '"';
+$last_modified_str = gmdate('D, d M Y H:i:s \G\M\T', $latest_ts);
+
+header('Content-Type: application/rss+xml; charset=utf-8');
+header('ETag: ' . $etag);
+header('Last-Modified: ' . $last_modified_str);
+header('Cache-Control: public, max-age=300');
+header('Vary: Accept-Encoding');
+
+$if_none_match = preg_replace('/^W\//', '', trim($_SERVER['HTTP_IF_NONE_MATCH'] ?? ''));
+$if_modified_since = trim($_SERVER['HTTP_IF_MODIFIED_SINCE'] ?? '');
+
+if ($if_none_match === $etag || ($if_modified_since !== '' && strtotime($if_modified_since) >= $latest_ts)) {
+    http_response_code(304);
+    exit;
+}
+
+function send_rss_response(string $xml, int $last_modified_ts, ?string $etag = null): void {
+    $etag = $etag ?? ('"' . md5($xml) . '"');
     $last_modified_str = gmdate('D, d M Y H:i:s \G\M\T', $last_modified_ts);
 
     header('Content-Type: application/rss+xml; charset=utf-8');
     header('ETag: ' . $etag);
     header('Last-Modified: ' . $last_modified_str);
     header('Cache-Control: public, max-age=300');
+    header('Vary: Accept-Encoding');
     header('Content-Length: ' . strlen($xml));
-
-    $if_none_match = trim($_SERVER['HTTP_IF_NONE_MATCH'] ?? '');
-    $if_modified_since = trim($_SERVER['HTTP_IF_MODIFIED_SINCE'] ?? '');
-
-    if ($if_none_match === $etag || ($if_modified_since !== '' && strtotime($if_modified_since) >= $last_modified_ts)) {
-        http_response_code(304);
-        exit;
-    }
 
     echo $xml;
     exit;
 }
 
-$tokenStr = trim($_GET['token'] ?? '');
 $cache_key = 'rss_feed_' . $p['id'] . '_' . md5($tokenStr);
 $cached_xml = kp_cache_get($cache_key);
 if ($cached_xml) {
-    send_rss_response($cached_xml, $latest_ts);
+    send_rss_response($cached_xml, $latest_ts, $etag);
 }
 
 function xml_sanitize(?string $str): string {
@@ -466,4 +476,4 @@ echo '<?xml version="1.0" encoding="UTF-8"?>' . "\n";
 $final_xml = ob_get_clean();
 $final_xml = kp_apply_filters('feed_rss_xml', $final_xml, $p);
 kp_cache_set($cache_key, $final_xml, 300); // 5 minutes TTL
-send_rss_response($final_xml, $latest_ts);
+send_rss_response($final_xml, $latest_ts, $etag);

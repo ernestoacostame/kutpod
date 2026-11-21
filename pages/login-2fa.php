@@ -18,29 +18,34 @@ if (!$u || empty($u['totp_secret'])) {
 
 $error = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $code = trim($_POST['code'] ?? '');
-    
-    // Verify TOTP code
-    if (kp_totp_verify($u['totp_secret'], $code)) {
-        unset($_SESSION['pending_2fa_user_id']);
-        
-        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
-        $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 120);
-        $token = bin2hex(random_bytes(32));
-        $expires = gmdate('Y-m-d H:i:s', time() + 60*60*24*30); // 30 días
-        
-        kp_exec("INSERT INTO sessions (token,user_id,ip,user_agent,expires_at) VALUES (?,?,?,?,?)",
-          [$token, $u['id'], $ip, substr($ua, 0, 240), $expires]);
-        kp_db()->prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?")->execute([$u['id']]);
-
-        $secure = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] == 443);
-        setcookie('kp_sess', $token, ['expires' => time()+60*60*24*30, 'path'=>'/', 'httponly'=>true, 'secure'=>$secure, 'samesite'=>'Lax']);
-        kp_alert('security', 'Inicio de sesión (2FA)', "{$u['name']} accedió tras validar 2FA desde $ip.", '/admin', ['actor_name' => $u['name']]);
-        
-        header('Location: /admin');
-        exit;
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    if (kp_login_rate_limited($ip)) {
+        $error = __('auth_rate_limited', 'Demasiados intentos fallidos. Espera 15 minutos antes de volver a intentarlo.');
     } else {
-        $error = __('auth_2fa_invalid_code', 'Código de verificación incorrecto o expirado.');
+        $code = trim($_POST['code'] ?? '');
+        
+        // Verify TOTP code
+        if (kp_totp_verify($u['totp_secret'], $code)) {
+            unset($_SESSION['pending_2fa_user_id']);
+            
+            $ua = substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 120);
+            $token = bin2hex(random_bytes(32));
+            $expires = gmdate('Y-m-d H:i:s', time() + 60*60*24*30); // 30 días
+            
+            kp_exec("INSERT INTO sessions (token,user_id,ip,user_agent,expires_at) VALUES (?,?,?,?,?)",
+              [$token, $u['id'], $ip, substr($ua, 0, 240), $expires]);
+            kp_db()->prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?")->execute([$u['id']]);
+
+            $secure = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['SERVER_PORT'] == 443);
+            setcookie('kp_sess', $token, ['expires' => time()+60*60*24*30, 'path'=>'/', 'httponly'=>true, 'secure'=>$secure, 'samesite'=>'Lax']);
+            kp_alert('security', 'Inicio de sesión (2FA)', "{$u['name']} accedió tras validar 2FA desde $ip.", '/admin', ['actor_name' => $u['name']]);
+            
+            header('Location: /admin');
+            exit;
+        } else {
+            kp_login_record_failure($ip);
+            $error = __('auth_2fa_invalid_code', 'Código de verificación incorrecto o expirado.');
+        }
     }
 }
 ?>

@@ -8,6 +8,9 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/rss-import.php';
 
 $u = kp_require_role('owner','admin','editor');
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+  kp_csrf_verify();
+}
 header('Content-Type: application/json; charset=utf-8');
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';

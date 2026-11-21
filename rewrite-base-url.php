@@ -5,6 +5,11 @@
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
 kp_require_role('owner');
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+  http_response_code(405);
+  exit(json_encode(['error' => 'Method not allowed']));
+}
+kp_csrf_verify();
 header('Content-Type: application/json; charset=utf-8');
 
 $from = rtrim(trim($_POST['from'] ?? ''), '/');

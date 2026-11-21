@@ -417,7 +417,8 @@ function kpUpdateApply() {
 
   const dlBody = new URLSearchParams({
     action: 'download',
-    zip_url: btoa(_updateData.zip_url)
+    zip_url: btoa(_updateData.zip_url),
+    _csrf: '<?= kp_csrf_token() ?>'
   });
 
   fetch('/api/update', { method: 'POST', body: dlBody })
@@ -440,7 +441,8 @@ function kpUpdateApply() {
       const applyBody = new URLSearchParams({
         action: 'apply',
         zip_path: dlData.path,
-        new_version: _updateData.new_version
+        new_version: _updateData.new_version,
+        _csrf: '<?= kp_csrf_token() ?>'
       });
 
       return fetch('/api/update', { method: 'POST', body: applyBody })
@@ -496,7 +498,7 @@ function kpUpdateRollback() {
 
   fetch('/api/update', {
     method: 'POST',
-    body: new URLSearchParams({ action: 'rollback', backup_file: backupFile })
+    body: new URLSearchParams({ action: 'rollback', backup_file: backupFile, _csrf: '<?= kp_csrf_token() ?>' })
   })
     .then(r => r.json())
     .then(data => {
@@ -546,7 +548,8 @@ function kpCleanDownloads() {
 
   const body = new URLSearchParams({
     action: 'clean_downloads',
-    include_rollbacks: includeRollbacks ? '1' : '0'
+    include_rollbacks: includeRollbacks ? '1' : '0',
+    _csrf: '<?= kp_csrf_token() ?>'
   });
 
   fetch('/api/update', { method: 'POST', body })
@@ -622,6 +625,7 @@ function kpManualUpdateUpload(e) {
   const formData = new FormData();
   formData.append('action', 'upload');
   formData.append('zip_file', file);
+  formData.append('_csrf', '<?= kp_csrf_token() ?>');
 
   fetch('/api/update', {
     method: 'POST',

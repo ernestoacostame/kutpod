@@ -1128,5 +1128,57 @@ if (file_exists(__DIR__ . '/../storage/kutpod.db')) {
   kp_do_action('init');
 }
 
+/**
+ * Verifica que una URL remota sea segura para peticiones salientes (anti-SSRF).
+ * Solo permite http/https y rechaza IPs privadas, loopback, link-local o reservadas.
+ */
+function kp_is_safe_remote_url(string $url): bool {
+  if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
+    return false;
+  }
+  $parts = parse_url($url);
+  if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
+    return false;
+  }
+  $scheme = strtolower($parts['scheme']);
+  if (!in_array($scheme, ['http', 'https'], true)) {
+    return false;
+  }
+  $host = trim($parts['host'], '[]');
+  if ($host === '') {
+    return false;
+  }
+
+  $isSafeIp = static function (string $ip): bool {
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+      return false;
+    }
+    $lower = strtolower($ip);
+    if (str_starts_with($ip, '127.') || str_starts_with($ip, '169.254.') || str_starts_with($ip, '0.') || $lower === '::1') {
+      return false;
+    }
+    if (str_starts_with($lower, 'fe80:') || str_starts_with($lower, 'fc') || str_starts_with($lower, 'fd')) {
+      return false;
+    }
+    return true;
+  };
+
+  if (filter_var($host, FILTER_VALIDATE_IP)) {
+    return $isSafeIp($host);
+  }
+
+  $ips = @gethostbynamel($host);
+  if (!$ips || !is_array($ips)) {
+    return false;
+  }
+  foreach ($ips as $ip) {
+    if (!$isSafeIp($ip)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+
 
 

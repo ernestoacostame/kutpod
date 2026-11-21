@@ -1,7 +1,10 @@
 <?php
 // pages/preferences.php — preferencias de instancia + OP3
 require_once __DIR__ . '/../includes/helpers.php';
+require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/op3-stats.php';
+
+kp_require_role('owner', 'admin');
 
 // POST · guardar campos de instancia en tabla settings
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_form'] ?? '') === 'appearance') {
@@ -572,7 +575,7 @@ function kpRewriteBaseUrl(dry){
   if (!dry && !confirm(PREF_I18N.rwConfirm.replace('{from}', from).replace('{to}', to))) return;
   status.textContent = dry ? PREF_I18N.rwSimulating : PREF_I18N.rwRewriting;
   report.style.display = 'none';
-  const body = new URLSearchParams({from, to});
+  const body = new URLSearchParams({from, to, _csrf: '<?= kp_csrf_token() ?>'});
   if (dry) body.set('dry', '1');
   fetch('/rewrite-base-url.php', {method:'POST', body})
     .then(r => r.json())

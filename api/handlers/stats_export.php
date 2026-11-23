@@ -59,6 +59,10 @@ $period_label = $range_labels[$range] ?? ($days . ' días');
 $podParam = $_GET['podcast'] ?? $_GET['podcast_id'] ?? $_GET['show'] ?? null;
 $podWhere = "WHERE p.hidden = 0";
 $podArgs  = [];
+if (!in_array($user['role'] ?? '', ['owner', 'admin'], true)) {
+    $podWhere .= " AND EXISTS (SELECT 1 FROM podcast_users pu WHERE pu.podcast_id = p.id AND pu.user_id = ?)";
+    $podArgs[] = (int)($user['id'] ?? 0);
+}
 if ($podParam) {
     if (is_numeric($podParam)) {
         $podWhere .= " AND p.id = ?";

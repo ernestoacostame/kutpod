@@ -1083,11 +1083,14 @@ function kp_ap_resolve_webfinger(string $acct): ?array {
   if (count($parts) !== 2) return null;
   $host = $parts[1];
   $url = "https://$host/.well-known/webfinger?resource=acct:$acct";
+  if (!kp_is_safe_remote_url($url)) return null;
   $ch = curl_init($url);
   curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_HTTPHEADER => ['Accept: application/jrd+json, application/json'],
     CURLOPT_USERAGENT => 'KutPod/1.0 (+' . kp_ap_base() . ')',
+    CURLOPT_FOLLOWLOCATION => false,
+    CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
     CURLOPT_TIMEOUT => 10,
   ]);
   $r = curl_exec($ch); curl_close($ch);
@@ -1136,7 +1139,7 @@ function kp_ap_dm_admin(array $p, string $commentUrl, string $authorHandle): voi
     'to' => [$adminActor], // Direct message (Solo al admin)
     'cc' => [],
     'published' => gmdate('c'),
-    'content' => "<p><span class=\"h-card\" translate=\"no\"><a href=\"{$adminActor}\" class=\"u-url mention\">@<span>admin</span></a></span> Tienes un nuevo comentario de <strong>@{$authorHandle}</strong> en tu podcast.</p><p><a href=\"{$commentUrl}\">Ver comentario original</a></p>",
+    'content' => "<p><span class=\"h-card\" translate=\"no\"><a href=\"" . htmlspecialchars($adminActor, ENT_QUOTES, 'UTF-8') . "\" class=\"u-url mention\">@<span>admin</span></a></span> Tienes un nuevo comentario de <strong>@" . htmlspecialchars($authorHandle, ENT_QUOTES, 'UTF-8') . "</strong> en tu podcast.</p><p><a href=\"" . htmlspecialchars($commentUrl, ENT_QUOTES, 'UTF-8') . "\">Ver comentario original</a></p>",
     'tag' => [
       [
         'type' => 'Mention',

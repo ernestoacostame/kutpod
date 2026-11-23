@@ -23,6 +23,10 @@ if (!$real_podcast_id || !kp_can_edit_podcast((int)$real_podcast_id)) {
 $ep = null;
 if ($ep_id && $real_podcast_id) {
     $ep = kp_one("SELECT * FROM episodes WHERE (slug = ? OR id = ?) AND podcast_id = ?", [$ep_id, $ep_id, $real_podcast_id]);
+    if ($ep && ($current_user['role'] ?? '') === 'author' && (int)($ep['created_by'] ?? 0) !== (int)($current_user['id'] ?? 0)) {
+        http_response_code(403);
+        exit('403 · Acceso denegado');
+    }
 }
 
 // Calculate default season and episode number

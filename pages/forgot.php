@@ -15,7 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $expires = time() + 3600; // 1 hora
       kp_db()->prepare("UPDATE users SET reset_token = ?, reset_expires = ? WHERE id = ?")->execute([$token, $expires, $u['id']]);
       
-      $resetLink = 'https://' . ($inst['domain'] ?: $_SERVER['HTTP_HOST']) . '/admin/reset?token=' . $token;
+      $rawHost = $_SERVER['HTTP_HOST'] ?? 'localhost';
+      $safeHost = preg_match('/^[a-zA-Z0-9.-]+(:\d+)?$/', $rawHost) ? $rawHost : 'localhost';
+      $resetLink = 'https://' . ($inst['domain'] ?: $safeHost) . '/admin/reset?token=' . $token;
       
       $subject = "Recuperación de contraseña en " . $inst['name'];
       $body = "Hola " . $u['name'] . ",\n\nHas solicitado restablecer tu contraseña.\n\nPor favor, haz clic en el siguiente enlace (válido por 1 hora):\n$resetLink\n\nSi no fuiste tú, ignora este mensaje.\n\nKutPod";

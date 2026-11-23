@@ -206,6 +206,8 @@ function kp_update_download(string $zipUrl): array {
     CURLOPT_USERAGENT => 'KutPod/' . KUTPOD_VERSION,
     CURLOPT_FOLLOWLOCATION => true,
     CURLOPT_MAXREDIRS => 5,
+    CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+    CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
     CURLOPT_TIMEOUT => 300,
   ]);
   curl_exec($ch);

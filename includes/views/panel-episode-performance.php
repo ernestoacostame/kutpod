@@ -248,7 +248,7 @@ for ($d = 0; $d <= $maxDays; $d++) {
       'plotW'       => $plotW,
       'plotH'       => $plotH,
       'perfMode'    => $perfMode
-    ]) ?>;
+    ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 
     const activeEpIds = new Set(PERF_DATA.episodes.filter(e => e.is_checked).map(e => e.id));
 

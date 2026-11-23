@@ -1167,8 +1167,19 @@ function kp_is_safe_remote_url(string $url): bool {
     return $isSafeIp($host);
   }
 
-  $ips = @gethostbynamel($host);
-  if (!$ips || !is_array($ips)) {
+  $ips = [];
+  $recs = @dns_get_record($host, DNS_A | DNS_AAAA);
+  if (is_array($recs)) {
+    foreach ($recs as $r) {
+      if (!empty($r['ip'])) $ips[] = $r['ip'];
+      if (!empty($r['ipv6'])) $ips[] = $r['ipv6'];
+    }
+  }
+  if (empty($ips)) {
+    $v4 = @gethostbynamel($host);
+    if (is_array($v4)) $ips = $v4;
+  }
+  if (empty($ips)) {
     return false;
   }
   foreach ($ips as $ip) {

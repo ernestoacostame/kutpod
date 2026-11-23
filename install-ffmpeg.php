@@ -8,6 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     exit(json_encode(['error' => 'Method not allowed']));
 }
+kp_csrf_verify();
 
 @set_time_limit(300);
 

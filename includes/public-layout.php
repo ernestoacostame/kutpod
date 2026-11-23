@@ -50,7 +50,7 @@ $canonical_url = $og_url ?? ($current_protocol . '://' . $current_host . strtok(
 <meta name="description" content="<?= e($og_description ?? $inst['tagline'] ?? '') ?>"/>
 <meta name="robots" content="index, follow"/>
 <?php if (!empty($og_jsonld)): ?>
-<script type="application/ld+json"><?= json_encode($og_jsonld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) ?></script>
+<script type="application/ld+json"><?= json_encode($og_jsonld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <?php endif; ?>
 
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -60,6 +60,7 @@ $canonical_url = $og_url ?? ($current_protocol . '://' . $current_host . strtok(
 <link rel="stylesheet" href="/assets/public.css?v=<?= filemtime(__DIR__ . '/../assets/public.css') ?>"/>
 <?php
 $acc = kp_setting('public_accent', '#ff5f7e');
+if (!preg_match('/^#[0-9a-f]{6}$/i', $acc)) $acc = '#ff5f7e';
 $acc_rgb = sscanf($acc, "#%02x%02x%02x");
 if ($acc_rgb && count($acc_rgb) === 3) {
     $rgb_str = $acc_rgb[0].', '.$acc_rgb[1].', '.$acc_rgb[2];

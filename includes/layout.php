@@ -40,6 +40,7 @@ $cur_lang = kp_detect_lang();
 <link rel="stylesheet" href="/assets/styles.css?v=<?= filemtime(__DIR__ . '/../assets/styles.css') ?>">
 <?php
 $acc = kp_setting('admin_accent', '#ff5f7e');
+if (!preg_match('/^#[0-9a-f]{6}$/i', $acc)) $acc = '#ff5f7e';
 $acc_rgb = sscanf($acc, "#%02x%02x%02x");
 if ($acc_rgb && count($acc_rgb) === 3) {
     $rgb_str = $acc_rgb[0].', '.$acc_rgb[1].', '.$acc_rgb[2];

@@ -39,13 +39,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['_form'] ?? '') === 'instan
     }
   }
   
-  if (!empty($_FILES['instance_logo']['tmp_name'])) {
-    $ext = strtolower(pathinfo($_FILES['instance_logo']['name'], PATHINFO_EXTENSION));
-    if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg', 'ico'], true)) $ext = 'png';
-    $name_file = 'instance_logo_' . uniqid() . '.' . $ext;
-    $dest = __DIR__ . '/../media/' . $name_file;
-    if (move_uploaded_file($_FILES['instance_logo']['tmp_name'], $dest)) {
-      $set->execute(['instance_logo', '/media/' . $name_file]);
+  if (!empty($_FILES['instance_logo']['tmp_name']) && is_uploaded_file($_FILES['instance_logo']['tmp_name'])) {
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = $finfo ? finfo_file($finfo, $_FILES['instance_logo']['tmp_name']) : '';
+    if ($finfo) finfo_close($finfo);
+    $mimeMap = ['image/jpeg'=>'jpg','image/png'=>'png','image/webp'=>'webp','image/gif'=>'gif','image/x-icon'=>'ico','image/vnd.microsoft.icon'=>'ico'];
+    if (isset($mimeMap[$mime])) {
+      $ext = $mimeMap[$mime];
+      $name_file = 'instance_logo_' . bin2hex(random_bytes(8)) . '.' . $ext;
+      $dest = __DIR__ . '/../media/' . $name_file;
+      if (move_uploaded_file($_FILES['instance_logo']['tmp_name'], $dest)) {
+        $set->execute(['instance_logo', '/media/' . $name_file]);
+      }
     }
   }
 

@@ -94,7 +94,7 @@ function ask(string $q, string $default = ''): string {
 // Si NO es CLI y no hay POST, muestra formulario web
 // ---------------------------------------------------------------------------
 if (!$cli && $_SERVER['REQUEST_METHOD'] !== 'POST') {
-  if (file_exists($LOCK)) {
+  if (file_exists($LOCK) || file_exists($DB)) {
     http_response_code(403);
     exit('<h1>' . $t['already_installed'] . '</h1><p>' . $t['delete_lock'] . '</p>');
   }

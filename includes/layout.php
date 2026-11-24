@@ -34,9 +34,7 @@ $cur_lang = kp_detect_lang();
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title><?= e($title ?? 'KutPod Studio') ?></title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/assets/fonts.css?v=<?= filemtime(__DIR__ . '/../assets/fonts.css') ?>">
 <link rel="stylesheet" href="/assets/styles.css?v=<?= filemtime(__DIR__ . '/../assets/styles.css') ?>">
 <?php
 $acc = kp_setting('admin_accent', '#ff5f7e');

@@ -53,9 +53,7 @@ $canonical_url = $og_url ?? ($current_protocol . '://' . $current_host . strtok(
 <script type="application/ld+json"><?= json_encode($og_jsonld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <?php endif; ?>
 
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="/assets/fonts.css?v=<?= filemtime(__DIR__ . '/../assets/fonts.css') ?>"/>
 <link rel="stylesheet" href="/assets/styles.css?v=<?= filemtime(__DIR__ . '/../assets/styles.css') ?>"/>
 <link rel="stylesheet" href="/assets/public.css?v=<?= filemtime(__DIR__ . '/../assets/public.css') ?>"/>
 <?php

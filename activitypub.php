@@ -469,6 +469,21 @@ function kp_ap_inbox(string $slug): void {
 // Publicar una nota nueva cuando un episodio se publica
 // (llamar desde new-episode.php tras INSERT con status='published')
 // ---------------------------------------------------------------------------
+function kp_ap_utc_iso(?string $raw): string {
+  $s = trim((string)($raw ?? ''));
+  if ($s === '' || $s === 'now') {
+    return gmdate('Y-m-d\TH:i:s\Z');
+  }
+  try {
+    $hasTz = (bool)preg_match('/(Z|[+-]\d{2}:?\d{2}|\bUTC\b|\bGMT\b)$/i', $s);
+    $dt = $hasTz ? new DateTimeImmutable($s) : new DateTimeImmutable($s, new DateTimeZone('UTC'));
+    return $dt->setTimezone(new DateTimeZone('UTC'))->format('Y-m-d\TH:i:s\Z');
+  } catch (Throwable $e) {
+    $ts = strtotime($s);
+    return gmdate('Y-m-d\TH:i:s\Z', $ts ?: time());
+  }
+}
+
 function kp_ap_publish_episode(int $episodeId, bool $resend = false): void {
   $e = kp_one("SELECT * FROM episodes WHERE id = ?", [$episodeId]);
   if (!$e) return;
@@ -497,7 +512,7 @@ function kp_ap_publish_episode(int $episodeId, bool $resend = false): void {
     'attributedTo' => $actor,
     'to' => ['https://www.w3.org/ns/activitystreams#Public'],
     'cc' => ["$actor/followers"],
-    'published' => gmdate('Y-m-d\TH:i:s\Z', strtotime($e['published_at'] ?: ($e['publish_at'] ?: ($e['created_at'] ?? 'now')))),
+    'published' => kp_ap_utc_iso($e['published_at'] ?: ($e['publish_at'] ?: ($e['created_at'] ?? null))),
     'url' => "$base/@{$p['slug']}/{$e['slug']}",
     'content' => "<p><strong>" . htmlspecialchars($e['title']) . "</strong></p>"
                  . $notes_html
@@ -1200,7 +1215,7 @@ function kp_ap_note(string $slug, string $epSlug): void {
     'attributedTo' => $actor,
     'to' => ['https://www.w3.org/ns/activitystreams#Public'],
     'cc' => ["$actor/followers"],
-    'published' => gmdate('Y-m-d\TH:i:s\Z', strtotime($e['published_at'] ?: 'now')),
+    'published' => kp_ap_utc_iso($e['published_at'] ?: null),
     'url' => "$base/@{$p['slug']}/{$e['slug']}",
     'content' => "<p><strong>" . htmlspecialchars($e['title']) . "</strong></p>"
                  . $notes_html

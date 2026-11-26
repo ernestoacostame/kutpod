@@ -21,11 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   if (isset($_POST['action']) && $_POST['action'] === 'delete_follower') {
     $fid = (int)($_POST['follower_id'] ?? 0);
     if ($fid > 0) {
-      $f = kp_one("SELECT inbox, actor_url FROM ap_followers WHERE id = ?", [$fid]);
+      $f = kp_one("SELECT podcast_id, inbox, actor_url FROM ap_followers WHERE id = ?", [$fid]);
       if ($f) {
         if (!empty($f['inbox'])) {
           require_once __DIR__ . '/../activitypub.php';
-          kp_ap_remove_follower_by_inbox($f['inbox'], "Eliminado manualmente desde panel fediverso");
+          kp_ap_remove_follower_by_inbox($f['inbox'], "Eliminado manualmente desde panel fediverso", (int)($f['podcast_id'] ?? 0) ?: null);
         } else {
           kp_q("DELETE FROM ap_followers WHERE id = ?", [$fid]);
         }
@@ -101,6 +101,10 @@ $followers = []; $blocked_domains = []; $blocked_users = []; $recent_episodes = 
 $total_followers = 0; $total_notes = 0; $total_boosts = 0;
 try {
   $followers       = kp_q("SELECT f.id, f.handle, f.handle as name, f.actor_url, f.inbox, p.title as podcast_title, '#6b7280' as color, f.followed_at as since, 'Siguiendo a ' || p.title as action FROM ap_followers f JOIN podcasts p ON p.id = f.podcast_id ORDER BY f.followed_at DESC LIMIT 50") ?: [];
+  $followers_by_podcast = [];
+  foreach (kp_q("SELECT id, podcast_id, handle, actor_url, inbox, followed_at FROM ap_followers ORDER BY followed_at DESC") ?: [] as $fr) {
+    $followers_by_podcast[(int)$fr['podcast_id']][] = $fr;
+  }
   $blocked_domains = kp_q("SELECT domain, kind, created_at as since, reason FROM fediverse_blocks ORDER BY created_at DESC") ?: [];
   $total_followers = (int)(kp_one("SELECT count(*) c FROM ap_followers")['c'] ?? 0);
   $total_notes     = (int)(kp_one("SELECT count(*) c FROM ap_outbox WHERE type = 'Create'")['c'] ?? 0);
@@ -188,10 +192,12 @@ try {
           </div>
           <span class="tag" style="background:#10b98122;color:#10b981;font-size:11px;flex-shrink:0"><?= __('active', 'activa') ?></span>
         </div>
-        <div class="row" style="gap:22px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12.5px">
-          <div>
-            <div style="color:var(--text-3);font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600"><?= __('followers', 'Seguidores') ?></div>
-            <div class="tabular" style="font-weight:600;margin-top:3px;font-size:14px"><?= number_format($f_count) ?></div>
+        <div class="row" style="gap:22px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);font-size:12.5px;align-items:center">
+          <div role="button" tabindex="0" onclick="openPodcastFollowersModal(<?= (int)$p['db_id'] ?>, <?= htmlspecialchars(json_encode($p['title']), ENT_QUOTES, 'UTF-8') ?>)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPodcastFollowersModal(<?= (int)$p['db_id'] ?>, <?= htmlspecialchars(json_encode($p['title']), ENT_QUOTES, 'UTF-8') ?>);}" style="cursor:pointer;padding:4px 8px;margin:-4px -8px;border-radius:8px;transition:background 0.15s" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='transparent'" title="<?= e(__('fedi_view_followers', 'Ver seguidores de este podcast')) ?>">
+            <div style="color:var(--text-3);font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600;display:flex;align-items:center;gap:4px">
+              <?= __('followers', 'Seguidores') ?> <span style="color:var(--accent);font-size:10px">↗</span>
+            </div>
+            <div class="tabular" style="font-weight:600;margin-top:3px;font-size:14px;color:var(--accent)"><?= number_format($f_count) ?></div>
           </div>
           <div>
             <div style="color:var(--text-3);font-size:10.5px;text-transform:uppercase;letter-spacing:0.06em;font-weight:600"><?= __('notes', 'Notas') ?></div>
@@ -328,3 +334,93 @@ try {
 </div>
 
 
+
+<div id="kp-podcast-followers-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this) closePodcastFollowersModal()">
+  <div class="card card-lg" style="width:100%;max-width:680px;max-height:82vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div class="card-head" style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px">
+      <div>
+        <div class="card-title" id="kp-followers-modal-title"><?= __('followers', 'Seguidores') ?></div>
+        <div class="page-sub" id="kp-followers-modal-count" style="font-size:12.5px;margin-top:2px"></div>
+      </div>
+      <button type="button" class="btn" onclick="closePodcastFollowersModal()"><?= __('close', 'Cerrar') ?></button>
+    </div>
+    <div style="padding:12px 24px;border-bottom:1px solid var(--border)">
+      <input type="text" id="kp-followers-modal-search" class="input" placeholder="<?= e(__('fedi_search_follower', 'Buscar por usuario o instancia...')) ?>" oninput="filterPodcastFollowersModal()" style="width:100%">
+    </div>
+    <div id="kp-followers-modal-list" style="overflow-y:auto;flex:1;padding:6px 0"></div>
+  </div>
+</div>
+
+<form method="POST" id="kp-modal-delete-follower-form" style="display:none">
+  <?= kp_csrf_field() ?>
+  <input type="hidden" name="action" value="delete_follower">
+  <input type="hidden" name="follower_id" id="kp-modal-delete-follower-id">
+</form>
+
+<script>
+const KP_FOLLOWERS_BY_PODCAST = <?= json_encode($followers_by_podcast ?? [], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?>;
+let kpCurrentFollowersList = [];
+
+function openPodcastFollowersModal(podcastId, podcastTitle) {
+  kpCurrentFollowersList = KP_FOLLOWERS_BY_PODCAST[String(podcastId)] || KP_FOLLOWERS_BY_PODCAST[podcastId] || [];
+  document.getElementById('kp-followers-modal-title').textContent = podcastTitle + ' · <?= e(__('followers', 'Seguidores')) ?>';
+  document.getElementById('kp-followers-modal-search').value = '';
+  renderPodcastFollowersModal(kpCurrentFollowersList);
+  const modal = document.getElementById('kp-podcast-followers-modal');
+  modal.style.display = 'flex';
+}
+
+function closePodcastFollowersModal() {
+  document.getElementById('kp-podcast-followers-modal').style.display = 'none';
+}
+
+function filterPodcastFollowersModal() {
+  const q = (document.getElementById('kp-followers-modal-search').value || '').toLowerCase().trim();
+  if (!q) {
+    renderPodcastFollowersModal(kpCurrentFollowersList);
+    return;
+  }
+  const filtered = kpCurrentFollowersList.filter(f =>
+    (f.handle || '').toLowerCase().includes(q) ||
+    (f.actor_url || '').toLowerCase().includes(q) ||
+    (f.inbox || '').toLowerCase().includes(q)
+  );
+  renderPodcastFollowersModal(filtered);
+}
+
+function renderPodcastFollowersModal(rows) {
+  const countEl = document.getElementById('kp-followers-modal-count');
+  const listEl = document.getElementById('kp-followers-modal-list');
+  countEl.textContent = rows.length + ' <?= e(strtolower(__('followers', 'seguidores'))) ?>';
+
+  if (!rows.length) {
+    listEl.innerHTML = '<div class="page-sub" style="padding:36px;text-align:center"><?= e(__('fedi_no_followers', 'Sin seguidores registrados.')) ?></div>';
+    return;
+  }
+
+  listEl.innerHTML = rows.map(f => {
+    const label = (f.handle && f.handle.trim()) ? f.handle : (f.actor_url || '?');
+    const initial = label.replace(/^@/, '').charAt(0).toUpperCase() || '?';
+    const actorUrl = f.actor_url || '#';
+    const inbox = f.inbox || '';
+    const date = f.followed_at || '';
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:12px 24px;border-bottom:1px solid var(--border);font-size:13px">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--surface-2);color:var(--text-1);font-weight:600;display:grid;place-items:center;flex-shrink:0">${escapeHtmlKp(initial)}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <a href="${escapeHtmlKp(actorUrl)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${escapeHtmlKp(label)}</a>
+          </div>
+          <div style="font-size:11.5px;color:var(--text-3);font-family:ui-monospace,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtmlKp(inbox || actorUrl)}</div>
+        </div>
+        <div style="font-size:12px;color:var(--text-3);white-space:nowrap">${escapeHtmlKp(date)}</div>
+        <button type="button" class="kebab" title="<?= e(__('delete', 'Eliminar')) ?>" style="color:var(--text-3)" onclick="if(confirm('<?= e(__('fedi_confirm_remove_follower', '¿Eliminar este seguidor?')) ?>')){ document.getElementById('kp-modal-delete-follower-id').value='${Number(f.id)}'; document.getElementById('kp-modal-delete-follower-form').submit(); }">✕</button>
+      </div>
+    `;
+  }).join('');
+}
+
+function escapeHtmlKp(str) {
+  return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+}
+</script>

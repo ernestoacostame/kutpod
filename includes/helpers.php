@@ -333,8 +333,9 @@ function stat_card(string $label, string $value, string $iconName, array $opts =
     $delta = '<div class="delta '.e($d['dir']).'">'.icon($d['dir']==='up'?'arrowUp':'arrowDown',12).' '.e($d['val']).'</div>';
   }
   if (!empty($opts['sub'])) $sub = '<div class="stat-sub">'.e($opts['sub']).'</div>';
+  $iconHtml = $iconName !== '' ? '<div class="stat-icon">'.icon($iconName,14).'</div>' : '';
   return '<div class="stat">
-    <div class="stat-head"><div class="stat-label">'.e($label).'</div><div class="stat-icon">'.icon($iconName,14).'</div></div>
+    <div class="stat-head"><div class="stat-label">'.e($label).'</div>'.$iconHtml.'</div>
     <div class="stat-value tabular">'.e($value).'</div>'.$delta.$sub.$foot.'</div>';
 }
 

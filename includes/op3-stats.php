@@ -580,18 +580,20 @@ function kp_op3_all_podcasts_playback_totals(int $days = 30): array {
   if (!$episodes) return $zero;
 
   $extByEp = [];
-  try {
-    $extRows = kp_q("
-      SELECT eps.episode_id, eps.platform, eps.plays, eps.listeners, eps.avg_playback_secs, eps.completion_pct, eps.total_time_secs
-      FROM external_platform_stats eps
-      JOIN episodes e ON e.id = eps.episode_id
-      JOIN podcasts p ON p.id = e.podcast_id
-      WHERE p.hidden = 0 AND e.hidden = 0 AND eps.platform IN ('apple', 'spotify')
-    ");
-    foreach ($extRows as $er) {
-      $extByEp[(int)$er['episode_id']][$er['platform']] = $er;
-    }
-  } catch (Throwable $e) {}
+  if (function_exists('kp_plugin_is_active') && kp_plugin_is_active('external_metrics')) {
+    try {
+      $extRows = kp_q("
+        SELECT eps.episode_id, eps.platform, eps.plays, eps.listeners, eps.avg_playback_secs, eps.completion_pct, eps.total_time_secs
+        FROM external_platform_stats eps
+        JOIN episodes e ON e.id = eps.episode_id
+        JOIN podcasts p ON p.id = e.podcast_id
+        WHERE p.hidden = 0 AND e.hidden = 0 AND eps.platform IN ('apple', 'spotify')
+      ");
+      foreach ($extRows as $er) {
+        $extByEp[(int)$er['episode_id']][$er['platform']] = $er;
+      }
+    } catch (Throwable $e) {}
+  }
 
   $byPodcast = [];
   foreach ($episodes as $ep) {

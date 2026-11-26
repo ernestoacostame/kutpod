@@ -2049,6 +2049,10 @@ textarea.block-input { resize: vertical; line-height: 1.5; }
   cursor: pointer;
   padding: 0 1px;
 }
+.compact-bars .chart-day-bar-wrap {
+  padding: 0;
+  min-width: 2px;
+}
 .chart-day-bar {
   background: var(--accent);
   opacity: 0.85;

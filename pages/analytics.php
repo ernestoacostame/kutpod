@@ -268,12 +268,12 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
     $global_playback = kp_op3_all_podcasts_playback_totals($days);
   ?>
   <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
-    <?= stat_card(__('analytics_total_downloads', 'Descargas totales'), number_format($tot), 'download') ?>
-    <?= stat_card(__('analytics_downloads_period', 'Descargas · :range', ['range' => $range]), number_format($tot_period), 'chart') ?>
-    <?= stat_card(__('analytics_unique_listeners', 'Oyentes únicos'), number_format($unique_listeners), 'users', ['sub'=>__('analytics_identified_op3', 'identificados por OP3')]) ?>
-    <?= stat_card(__('analytics_avg_playback', 'Tiempo promedio'), $global_playback['avg_playback_fmt'], 'clock', ['sub' => $global_playback['avg_completion_pct'] > 0 ? ($global_playback['avg_completion_pct'] . '% ' . __('analytics_avg_playback_sub', 'retención media')) : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
-    <?= stat_card(__('analytics_total_time_listened', 'Tiempo total escuchado'), $global_playback['total_time_fmt'], 'headphones', ['sub' => $global_playback['total_time_fmt'] !== '—' ? __('analytics_total_hours_sub', 'horas de atención') : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
-    <?= stat_card(__('analytics_active_podcasts', 'Podcasts activos'), (string)count($podcasts), 'mic') ?>
+    <?= stat_card(__('analytics_total_downloads', 'Descargas totales'), number_format($tot), '') ?>
+    <?= stat_card(__('analytics_downloads_period', 'Descargas · :range', ['range' => $range]), number_format($tot_period), '') ?>
+    <?= stat_card(__('analytics_unique_listeners', 'Oyentes únicos'), number_format($unique_listeners), '', ['sub'=>__('analytics_identified_op3', 'identificados por OP3')]) ?>
+    <?= stat_card(__('analytics_avg_playback', 'Tiempo promedio'), $global_playback['avg_playback_fmt'], '', ['sub' => $global_playback['avg_completion_pct'] > 0 ? ($global_playback['avg_completion_pct'] . '% ' . __('analytics_avg_playback_sub', 'retención media')) : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
+    <?= stat_card(__('analytics_total_time_listened', 'Tiempo total escuchado'), $global_playback['total_time_fmt'], '', ['sub' => $global_playback['total_time_fmt'] !== '—' ? __('analytics_total_hours_sub', 'horas de atención') : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
+    <?= stat_card(__('analytics_active_podcasts', 'Podcasts activos'), (string)count($podcasts), '') ?>
     <?php kp_do_action('analytics_stat_grid'); ?>
   </div>
 
@@ -341,7 +341,12 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
             </div>
           <?php endif; ?>
         </div>
-        <div style="position:relative;height:260px;margin-top:24px;display:flex;align-items:flex-end;gap:5px">
+        <?php
+          $barCount = count($series);
+          $chartGap = $barCount > 90 ? '1px' : ($barCount > 45 ? '2px' : '5px');
+          $isCompactBars = $barCount > 60;
+        ?>
+        <div class="<?= $isCompactBars ? 'compact-bars' : '' ?>" style="position:relative;height:260px;margin-top:24px;display:flex;align-items:flex-end;gap:<?= $chartGap ?>;overflow-x:auto">
           <?php foreach ($series as $d => $v):
             $h = $chart_max > 0 ? ($v / $chart_max) * 100 : 0;
             $yt_v = (int)($yt_series[$d] ?? 0);

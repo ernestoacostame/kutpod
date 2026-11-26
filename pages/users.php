@@ -16,7 +16,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $name = trim($_POST['name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password_plain = $_POST['password'] ?? '';
-    $role = $_POST['role'] ?? 'author';
+    $role = $_POST['role'] ?? 'host';
+    if (!in_array($role, ['owner', 'admin', 'editor', 'host', 'collaborator'], true)) {
+      $role = 'host';
+    }
+    if ($role === 'owner' && ($current_user['role'] ?? '') !== 'owner') {
+      $role = 'admin';
+    }
     $url = trim($_POST['url'] ?? '');
     $bio = trim($_POST['bio'] ?? '');
     
@@ -55,22 +61,27 @@ try {
                            FROM podcast_users m JOIN podcasts p ON p.id = m.podcast_id
                            WHERE m.user_id = u.id) as pods
                  FROM users u ORDER BY
-                   CASE u.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'editor' THEN 2 ELSE 3 END,
+                   CASE u.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'editor' THEN 2 WHEN 'host' THEN 3 WHEN 'author' THEN 3 ELSE 4 END,
                    u.name") ?: [];
 } catch (Throwable $e) {}
 
 // Sin fallback: si la BD está vacía la tabla muestra empty state.
 
 $role_meta = [
-  'owner'  => [__('users_role_owner', 'Owner'),  __('users_role_owner_desc', 'Acceso total a instancia, usuarios y todos los podcasts'), '#ff5f7e'],
-  'admin'  => [__('users_role_admin', 'Admin'),  __('users_role_admin_desc', 'Gestiona usuarios y podcasts, no toca instancia'),          '#6366f1'],
-  'editor' => [__('users_role_editor', 'Editor'), __('users_role_editor_desc', 'Crea y edita episodios en podcasts asignados'),             '#10b981'],
-  'author' => [__('users_role_author', 'Author'), __('users_role_author_desc', 'Solo edita episodios propios'),                             '#f59e0b'],
+  'owner'        => [__('users_role_owner', 'Dueño'),        __('users_role_owner_desc', 'Poder total sobre la instancia, usuarios (incluso otros dueños) y podcasts'), '#ff5f7e'],
+  'admin'        => [__('users_role_admin', 'Admin'),        __('users_role_admin_desc', 'Gestiona sitio, usuarios y podcasts (sin tocar dueños)'),                      '#6366f1'],
+  'editor'       => [__('users_role_editor', 'Editor'),      __('users_role_editor_desc', 'Edita información de podcasts y episodios asignados'),                        '#10b981'],
+  'host'         => [__('users_role_host', 'Host'),          __('users_role_host_desc', 'Presentador · publica y edita episodios propios en podcasts asignados'),        '#f59e0b'],
+  'collaborator' => [__('users_role_collab', 'Colaborador'), __('users_role_collab_desc', 'Colabora creando borradores y episodios propios en podcasts asignados'),      '#06b6d4'],
 ];
 
 // Cuenta por rol
-$by_role = ['owner'=>0,'admin'=>0,'editor'=>0,'author'=>0];
-foreach ($users as $u) { $r = $u['role'] ?? 'author'; if (isset($by_role[$r])) $by_role[$r]++; }
+$by_role = ['owner'=>0,'admin'=>0,'editor'=>0,'host'=>0,'collaborator'=>0];
+foreach ($users as $u) {
+  $r = $u['role'] ?? 'host';
+  if ($r === 'author') $r = 'host';
+  if (isset($by_role[$r])) $by_role[$r]++;
+}
 
 function initials_from($s) {
   $parts = preg_split('/\s+/', trim((string)$s));
@@ -115,8 +126,9 @@ function initials_from($s) {
       <div></div><div><?= __('user', 'Usuario') ?></div><div><?= __('email', 'Email') ?></div><div><?= __('role', 'Rol') ?></div><div><?= __('nav_podcasts', 'Podcasts') ?></div><div><?= __('users_last_login', 'Último acceso') ?></div><div></div>
     </div>
     <?php foreach ($users as $u):
-      $r = $u['role'] ?? 'author';
-      [$rlabel, , $rcolor] = $role_meta[$r] ?? ['Author','',$u['color'] ?? '#f59e0b'];
+      $r = $u['role'] ?? 'host';
+      if ($r === 'author') $r = 'host';
+      [$rlabel, , $rcolor] = $role_meta[$r] ?? ['Host','',$u['color'] ?? '#f59e0b'];
       $color = $u['color'] ?? $rcolor;
     ?>
       <div class="user-row" data-q="<?= e(strtolower(($u['name']??'').' '.($u['email']??''))) ?>"
@@ -182,10 +194,13 @@ function initials_from($s) {
     <div class="field" style="margin-top:12px"><label class="label"><?= __('email', 'Email') ?></label><input class="input" name="email" type="email" required/></div>
     <div class="field" style="margin-top:12px"><label class="label"><?= __('role', 'Rol') ?></label>
       <select class="select" name="role" required>
-        <option value="owner">Owner</option>
-        <option value="admin">Admin</option>
-        <option value="editor">Editor</option>
-        <option value="author" selected>Author</option>
+        <?php if (($current_user['role'] ?? '') === 'owner'): ?>
+        <option value="owner"><?= __('users_role_owner', 'Dueño') ?></option>
+        <?php endif; ?>
+        <option value="admin"><?= __('users_role_admin', 'Admin') ?></option>
+        <option value="editor"><?= __('users_role_editor', 'Editor') ?></option>
+        <option value="host" selected><?= __('users_role_host', 'Host') ?></option>
+        <option value="collaborator"><?= __('users_role_collab', 'Colaborador') ?></option>
       </select>
     </div>
     <div class="field" style="margin-top:12px"><label class="label"><?= __('password', 'Contraseña') ?></label><input class="input" name="password" type="password" required/></div>

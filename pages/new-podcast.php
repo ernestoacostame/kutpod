@@ -17,7 +17,7 @@ if ($mode === 'edit' && $id !== '') {
     }
 }
 
-$team_users = kp_q("SELECT id, name, email, avatar, role FROM users WHERE role IN ('editor','author') ORDER BY name ASC") ?: [];
+$team_users = kp_q("SELECT id, name, email, avatar, role FROM users WHERE role IN ('editor','host','author','collaborator') ORDER BY name ASC") ?: [];
 
 $apple_categories = [
     'Arts' => ['Books', 'Design', 'Fashion & Beauty', 'Food', 'Performing Arts', 'Visual Arts'],

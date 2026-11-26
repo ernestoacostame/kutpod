@@ -119,7 +119,7 @@ if ($kp_update_cache && !empty($kp_update_cache['available']) && !empty($kp_upda
     <div>
       <div class="card-title"><?= icon('upload',16) ?> <?= __('upd_manual_upload_pkg', 'Subir paquete de actualización (.zip)') ?></div>
       <div style="font-size:12.5px;color:var(--text-3);margin-top:4px">
-        <?= __('upd_manual_upload_pkg_desc', 'Si tu servidor no puede conectar a GitHub o prefieres actualizar manualmente, sube el archivo <code>.zip</code> descargado directamente desde los <a href="https://github.com/ernestoacostame/kutpod/releases" target="_blank" rel="noopener" style="color:var(--accent)">Releases de GitHub</a>.') ?>
+        <?= __raw('upd_manual_upload_pkg_desc', 'Si tu servidor no puede conectar a GitHub o prefieres actualizar manualmente, sube el archivo <code>.zip</code> descargado directamente desde los <a href="https://github.com/ernestoacostame/kutpod/releases" target="_blank" rel="noopener" style="color:var(--accent)">Releases de GitHub</a>.') ?>
       </div>
     </div>
   </div>

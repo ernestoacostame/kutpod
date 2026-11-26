@@ -17,6 +17,7 @@ if (!$user) {
 
 $current_user = kp_current_user();
 $is_self = ($uid === ($current_user['id'] ?? 0));
+$is_owner = ($current_user['role'] ?? '') === 'owner';
 $is_admin_or_owner = in_array($current_user['role'] ?? '', ['owner', 'admin'], true);
 
 // Access control: only owner, admin, or the user themselves can edit
@@ -25,8 +26,8 @@ if (!$is_self && !$is_admin_or_owner) {
   exit;
 }
 
-// Admins cannot edit/delete the owner
-if ($user['role'] === 'owner' && !$is_self) {
+// Admins (non-owner) cannot edit/delete an owner
+if ($user['role'] === 'owner' && !$is_self && !$is_owner) {
   setcookie('kp_flash', 'No tienes permisos para editar al propietario.', time() + 30, '/');
   header('Location: ' . admin_url('users'));
   exit;
@@ -92,9 +93,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $params[] = password_hash($password, PASSWORD_DEFAULT);
     }
 
-    // Only owners and admins can edit roles, and they cannot change the owner's role
-    if ($is_admin_or_owner && $user['role'] !== 'owner') {
-      if (in_array($role, ['owner', 'admin', 'editor', 'author'], true)) {
+    // Owners can edit any role (except demoting themselves if needed); admins cannot edit owners or assign owner
+    if ($is_admin_or_owner && ($is_owner || $user['role'] !== 'owner')) {
+      if ($role === 'owner' && !$is_owner) {
+        $role = 'admin';
+      }
+      if (in_array($role, ['owner', 'admin', 'editor', 'host', 'author', 'collaborator'], true)) {
         $updates[] = 'role = ?';
         $params[] = $role;
       }
@@ -110,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
 
   if ($action === 'delete_user') {
-    if (!$is_admin_or_owner || $is_self || $user['role'] === 'owner') {
+    if (!$is_admin_or_owner || $is_self || ($user['role'] === 'owner' && !$is_owner)) {
       setcookie('kp_flash', 'No tienes permisos para eliminar este usuario.', time() + 30, '/');
       header('Location: ' . admin_url('edit-user?id=' . $uid));
       exit;
@@ -207,13 +211,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $user = kp_one("SELECT * FROM users WHERE id = ?", [$uid]);
 
 $role_meta = [
-  'owner'  => ['Owner',  'Acceso total a instancia, usuarios y todos los podcasts', '#ff5f7e'],
-  'admin'  => ['Admin',  'Gestiona usuarios y podcasts, no toca instancia',          '#6366f1'],
-  'editor' => ['Editor', 'Crea y edita episodios en podcasts asignados',             '#10b981'],
-  'author' => ['Author', 'Solo edita episodios propios',                             '#f59e0b'],
+  'owner'        => [__('users_role_owner', 'Dueño'),        __('users_role_owner_desc', 'Poder total sobre la instancia, usuarios (incluso otros dueños) y podcasts'), '#ff5f7e'],
+  'admin'        => [__('users_role_admin', 'Admin'),        __('users_role_admin_desc', 'Gestiona sitio, usuarios y podcasts (sin tocar dueños)'),                      '#6366f1'],
+  'editor'       => [__('users_role_editor', 'Editor'),      __('users_role_editor_desc', 'Edita información de podcasts y episodios asignados'),                        '#10b981'],
+  'host'         => [__('users_role_host', 'Host'),          __('users_role_host_desc', 'Presentador · publica y edita episodios propios en podcasts asignados'),        '#f59e0b'],
+  'collaborator' => [__('users_role_collab', 'Colaborador'), __('users_role_collab_desc', 'Colabora creando borradores y episodios propios en podcasts asignados'),      '#06b6d4'],
 ];
 
-[$rlabel, , $rcolor] = $role_meta[$user['role']] ?? ['Author','','#f59e0b'];
+$effective_role = ($user['role'] === 'author') ? 'host' : ($user['role'] ?? 'host');
+[$rlabel, , $rcolor] = $role_meta[$effective_role] ?? ['Host','','#f59e0b'];
 $color = $user['color'] ?? $rcolor;
 
 if (!function_exists('initials_from')) {
@@ -278,13 +284,16 @@ if (!function_exists('initials_from')) {
       
       <div class="field" style="margin-top:16px"><label class="label"><?= __('email', 'Email') ?></label><input class="input" name="email" value="<?= e($user['email']) ?>" type="email" required/></div>
       
-      <?php if ($is_admin_or_owner && $user['role'] !== 'owner'): ?>
+      <?php if ($is_admin_or_owner && ($is_owner || $user['role'] !== 'owner')): ?>
         <div class="field" style="margin-top:16px"><label class="label"><?= __('role', 'Rol') ?></label>
           <select class="select" name="role">
-            <option value="owner" <?= $user['role'] === 'owner' ? 'selected' : '' ?>>Owner</option>
-            <option value="admin" <?= $user['role'] === 'admin' ? 'selected' : '' ?>>Admin</option>
-            <option value="editor" <?= $user['role'] === 'editor' ? 'selected' : '' ?>>Editor</option>
-            <option value="author" <?= $user['role'] === 'author' ? 'selected' : '' ?>>Author</option>
+            <?php if ($is_owner): ?>
+            <option value="owner" <?= $user['role'] === 'owner' ? 'selected' : '' ?>><?= __('users_role_owner', 'Dueño') ?></option>
+            <?php endif; ?>
+            <option value="admin" <?= $user['role'] === 'admin' ? 'selected' : '' ?>><?= __('users_role_admin', 'Admin') ?></option>
+            <option value="editor" <?= $user['role'] === 'editor' ? 'selected' : '' ?>><?= __('users_role_editor', 'Editor') ?></option>
+            <option value="host" <?= ($user['role'] === 'host' || $user['role'] === 'author') ? 'selected' : '' ?>><?= __('users_role_host', 'Host') ?></option>
+            <option value="collaborator" <?= $user['role'] === 'collaborator' ? 'selected' : '' ?>><?= __('users_role_collab', 'Colaborador') ?></option>
           </select>
         </div>
       <?php endif; ?>
@@ -296,7 +305,7 @@ if (!function_exists('initials_from')) {
       </div>
     </form>
 
-    <?php if ($is_admin_or_owner && !$is_self && $user['role'] !== 'owner'): ?>
+    <?php if ($is_admin_or_owner && !$is_self && ($is_owner || $user['role'] !== 'owner')): ?>
       <div class="card" style="padding:24px; border-color:rgba(239, 68, 68, 0.2)">
         <div class="card-title" style="margin-bottom:12px; color:#ef4444"><?= __('danger_zone', 'Zona de Peligro') ?></div>
         <p style="font-size:12.5px; color:var(--text-3); margin-bottom:16px; line-height:1.4"><?= __('users_delete_danger_desc', 'Eliminar de forma permanente este usuario. Se revocará todo su acceso y sesiones activas.') ?></p>

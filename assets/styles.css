@@ -933,7 +933,7 @@ input, textarea, select { font-family: inherit; color: inherit; }
 .required { color: var(--accent); }
 
 .input, .textarea, .select {
-  background: var(--surface);
+  background: var(--bg-2);
   border: 1px solid var(--border);
   border-radius: 9px;
   padding: 10px 12px;
@@ -948,7 +948,7 @@ input, textarea, select { font-family: inherit; color: inherit; }
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .select option, select option {
-  background-color: var(--surface);
+  background-color: var(--bg-2);
   color: var(--text);
 }
 .input.has-prefix {

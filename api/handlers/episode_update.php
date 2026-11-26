@@ -24,7 +24,7 @@ if (!$episode) {
     api_error(404, 'not_found', 'Episodio no encontrado');
 }
 
-if (($user['role'] ?? '') === 'author' && (int)$episode['created_by'] !== (int)$user['id']) {
+if (in_array($user['role'] ?? '', ['author', 'host', 'collaborator'], true) && (int)$episode['created_by'] !== (int)$user['id']) {
     api_error(403, 'forbidden', 'Rol de autor: Solo puedes modificar tus propios episodios');
 }
 

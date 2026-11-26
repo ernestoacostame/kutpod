@@ -280,11 +280,11 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
   <!-- Barra de pestañas organizadas por tipo -->
   <div class="stats-tabs-nav" role="tablist">
     <button type="button" class="stats-tab-btn <?= $active_tab === 'downloads' ? 'active' : '' ?>" data-tab="downloads" role="tab" aria-selected="<?= $active_tab === 'downloads' ? 'true' : 'false' ?>">
-      <?= icon('chart', 16) ?>
+      <?= icon('download', 16) ?>
       <span><?= __('analytics_tab_downloads', 'Descargas') ?></span>
     </button>
     <button type="button" class="stats-tab-btn <?= $active_tab === 'performance' ? 'active' : '' ?>" data-tab="performance" role="tab" aria-selected="<?= $active_tab === 'performance' ? 'true' : 'false' ?>">
-      <?= icon('activity', 16) ?>
+      <?= icon('chart', 16) ?>
       <span><?= __('analytics_tab_performance', 'Rendimiento') ?></span>
     </button>
     <button type="button" class="stats-tab-btn <?= $active_tab === 'location' ? 'active' : '' ?>" data-tab="location" role="tab" aria-selected="<?= $active_tab === 'location' ? 'true' : 'false' ?>">

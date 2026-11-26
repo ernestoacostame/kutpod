@@ -185,7 +185,11 @@ try {
     ?>
       <div style="padding:16px;border:1px solid var(--border);border-radius:12px">
         <div class="row" style="gap:12px;align-items:center">
-          <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,<?= e($p['color']) ?>,<?= e($p['color']) ?>99);color:white;font-weight:700;font-size:16px;display:grid;place-items:center;flex-shrink:0"><?= e($p['initial']) ?></div>
+          <?php if (!empty($p['cover'])): ?>
+            <img src="<?= e($p['cover']) ?>" style="width:44px;height:44px;border-radius:10px;object-fit:cover;flex-shrink:0" alt="">
+          <?php else: ?>
+            <div style="width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,<?= e($p['color']) ?>,<?= e($p['color']) ?>99);color:white;font-weight:700;font-size:16px;display:grid;place-items:center;flex-shrink:0"><?= e($p['initial']) ?></div>
+          <?php endif; ?>
           <div style="flex:1;min-width:0">
             <div style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($p['title']) ?></div>
             <div style="font-size:12px;color:var(--text-3);font-family:ui-monospace,monospace;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@<?= e($p['id']) ?>@<?= e($domain) ?></div>

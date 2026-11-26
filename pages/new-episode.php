@@ -294,6 +294,13 @@ $sections = [
   's2-4' => __('ep_transcripts_chapters', 'Transcripción & capítulos'),
   's2-5' => __('ep_advanced', 'Avanzados'),
 ];
+$epHeading = $ep ? __('ep_edit_episode', 'Editar episodio') : __('ep_new_episode', 'Nuevo episodio');
+$crumbs = [
+  [__('nav_podcasts', 'Podcasts'), admin_url('podcasts')],
+  [$p['title'], admin_url('podcast/' . urlencode($p['id']))],
+  [$p['title'] . ' · ' . $epHeading, null],
+];
+$title = $p['title'] . ' · ' . $epHeading;
 ?>
 <form method="POST" enctype="multipart/form-data" class="form-episode">
   <?= kp_csrf_field() ?>
@@ -496,10 +503,8 @@ $sections = [
             <span class="help" style="margin-top:4px; display:inline-block"><?= __('ep_price_annual_help', 'Precio anual opcional (con descuento).') ?></span>
           </div>
         </div>
-        <div class="field-row" style="margin-top:-6px; margin-bottom:6px">
-          <div class="field">
-            <span class="help" style="color:var(--text-muted)"><?= __('ep_premium_fee_help', 'Los oyentes pagan esta cuota para acceder a todos los episodios premium de este podcast. Puedes modificarla aquí o en los ajustes del show.') ?></span>
-          </div>
+        <div style="margin-top:10px; margin-bottom:6px">
+          <span class="help" style="color:var(--text-muted);display:block;line-height:1.45"><?= __('ep_premium_fee_help', 'Los oyentes pagan esta cuota para acceder a todos los episodios premium de este podcast. Puedes modificarla aquí o en los ajustes del show.') ?></span>
         </div>
         <div class="field-row" style="margin-top:14px">
           <div class="field"><label class="label"><?= __('ep_location_label', 'Ubicación del episodio') ?></label><input class="input" name="ep_location" value="<?= e($ep['location_name'] ?? '') ?>" placeholder="Caracas, Venezuela"></div>
@@ -536,7 +541,7 @@ $sections = [
     
     <aside class="span-3 form-toc" style="position:sticky; top:90px; align-self:start">
       <?php foreach ($sections as $a => $l): ?>
-        <a href="#<?= $a ?>" class="form-toc-item"><?= e($l) ?></a>
+        <a href="#<?= $a ?>" class="form-toc-item"><?= e(html_entity_decode((string)$l, ENT_QUOTES, 'UTF-8')) ?></a>
       <?php endforeach; ?>
       
       <div style="margin-top:32px;display:flex;flex-direction:column;gap:10px">

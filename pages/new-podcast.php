@@ -228,6 +228,13 @@ $sections = [
   's1-8' => __('pod_tab_advanced', 'Avanzados'),
 ];
 $sections = kp_apply_filters('podcast_form_sections', $sections);
+$pageHeading = $mode === 'create' ? __('pod_new_show', 'Nuevo podcast') : __('pod_edit_show', 'Editar podcast');
+$crumbLeaf = ($mode === 'edit' && $p) ? ($p['title'] . ' · ' . $pageHeading) : $pageHeading;
+$crumbs = [
+  [__('nav_podcasts', 'Podcasts'), admin_url('podcasts')],
+  [$crumbLeaf, null],
+];
+$title = $crumbLeaf;
 ?>
 <form method="POST" enctype="multipart/form-data" class="form-podcast">
   <?= kp_csrf_field() ?>
@@ -527,7 +534,7 @@ $sections = kp_apply_filters('podcast_form_sections', $sections);
     
     <aside class="span-3 form-toc" style="position:sticky; top:90px; align-self:start">
       <?php foreach ($sections as $anchor => $label): ?>
-        <a href="#<?= $anchor ?>" class="form-toc-item"><?= e($label) ?></a>
+        <a href="#<?= $anchor ?>" class="form-toc-item"><?= e(html_entity_decode((string)$label, ENT_QUOTES, 'UTF-8')) ?></a>
       <?php endforeach; ?>
       
       <div style="margin-top:32px;display:flex;flex-direction:column;gap:10px">

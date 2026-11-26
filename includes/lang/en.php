@@ -1136,6 +1136,7 @@ return [
     'users_role_host_desc' => 'Host · publishes and edits own episodes on assigned podcasts',
     'users_role_collab' => 'Collaborator',
     'users_role_collab_desc' => 'Collaborates by creating drafts and own episodes on assigned podcasts',
+    'fedi_identity_title' => 'Fediverse Identity',
     'users_sub' => 'Roles, permissions, and podcast assignment · :count accounts',
     'users_accounts_count' => ':count account(s)',
     'users_last_login' => 'Last login',

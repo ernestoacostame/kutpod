@@ -39,7 +39,7 @@ function kp_fediverse_plugin_form_sections(array $sections): array {
     foreach ($sections as $k => $v) {
         $new_sections[$k] = $v;
         if ($k === 's1-3') {
-            $new_sections['s1-4'] = 'Fediverso';
+            $new_sections['s1-4'] = __('nav_fediverse', 'Fediverso');
         }
     }
     return $new_sections;
@@ -52,7 +52,7 @@ function kp_fediverse_plugin_render_section_html(?array $p): void {
     ?>
     <!-- 1.4 Fediverso -->
     <section id="s1-4" class="card card-lg">
-      <header class="section-head"><h2>Identidad en el Fediverso</h2></header>
+      <header class="section-head"><h2><?= __('fedi_identity_title', 'Identidad en el Fediverso') ?></h2></header>
       <div class="field">
         <label class="label">Handle ActivityPub</label>
         <div class="input-affix"><span>@</span><input class="input" id="fediverse_handle" name="fediverse_handle" value="<?= e($p['fediverse_handle'] ?? ($p['slug'] ?? '')) ?>" pattern="[a-zA-Z0-9_]+" style="font-family:ui-monospace,monospace" oninput="this.dataset.manual=1"><span>@<?= e(kp_handle_domain()) ?></span></div>

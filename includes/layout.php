@@ -147,8 +147,22 @@ $is_auth_page = in_array($page, ['login', 'login-2fa', 'forgot', 'reset', 'recov
     <div class="topbar">
       <div class="crumbs">
         <a class="btn btn-ghost" style="padding:4px 8px;font-size:13px" href="<?= admin_url() ?>">KutPod</a>
-        <?= icon('chevronRight',14) ?>
-        <span class="crumb-current"><?= e($title ?? __('page')) ?></span>
+        <?php if (!empty($crumbs) && is_array($crumbs)): ?>
+          <?php foreach ($crumbs as $cr):
+            $cLabel = $cr[0] ?? '';
+            $cHref  = $cr[1] ?? null;
+          ?>
+            <?= icon('chevronRight',14) ?>
+            <?php if ($cHref): ?>
+              <a class="btn btn-ghost" style="padding:4px 8px;font-size:13px" href="<?= e($cHref) ?>"><?= e(html_entity_decode((string)$cLabel, ENT_QUOTES, 'UTF-8')) ?></a>
+            <?php else: ?>
+              <span class="crumb-current"><?= e(html_entity_decode((string)$cLabel, ENT_QUOTES, 'UTF-8')) ?></span>
+            <?php endif; ?>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <?= icon('chevronRight',14) ?>
+          <span class="crumb-current"><?= e($title ?? __('page')) ?></span>
+        <?php endif; ?>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
         <!-- Selector rápido de Idioma -->

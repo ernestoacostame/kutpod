@@ -1136,6 +1136,7 @@ return [
     'users_role_host_desc' => 'Presentador · publica y edita episodios propios en podcasts asignados',
     'users_role_collab' => 'Colaborador',
     'users_role_collab_desc' => 'Colabora creando borradores y episodios propios en podcasts asignados',
+    'fedi_identity_title' => 'Identidad en el Fediverso',
     'users_sub' => 'Roles, permisos y asignación de podcasts · :count cuentas',
     'users_accounts_count' => ':count cuenta(s)',
     'users_last_login' => 'Último acceso',

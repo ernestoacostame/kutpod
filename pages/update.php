@@ -42,14 +42,14 @@ if ($kp_update_cache && !empty($kp_update_cache['available']) && !empty($kp_upda
 
 <!-- Estado actual -->
 <div class="stat-grid">
-  <?= stat_card(__('upd_installed_version', 'Versión instalada'), 'v' . KUTPOD_VERSION, 'layers', ['sub' => __('upd_current_compilation', 'Compilación actual')]) ?>
-  <?= stat_card(__('upd_channel', 'Canal'), $hasToken ? __('upd_channel_github', 'GitHub Directo') : __('upd_channel_cloud', 'KutStudio Cloud'), 'shield',
+  <?= stat_card(__('upd_installed_version', 'Versión instalada'), 'v' . KUTPOD_VERSION, '', ['sub' => __('upd_current_compilation', 'Compilación actual')]) ?>
+  <?= stat_card(__('upd_channel', 'Canal'), $hasToken ? __('upd_channel_github', 'GitHub Directo') : __('upd_channel_cloud', 'KutStudio Cloud'), '',
        $hasToken
          ? ['sub' => __('upd_sub_token_active', 'Token de desarrollo activo'), 'foot' => '<div style="margin-top:8px"><a href="/admin/preferences#update-token" style="color:var(--accent);font-size:12px">' . __('nav_preferences') . ' →</a></div>']
          : ['sub' => __('upd_sub_transparent', 'Actualización transparente'), 'foot' => '<div style="margin-top:8px;font-size:11px;color:var(--text-3)">' . __('upd_foot_auto', 'Automático') . '</div>']) ?>
-  <?= stat_card(__('upd_rollback', 'Rollback'), $hasRollback ? 'v' . $rollbackVersion : __('upd_not_available', 'No disponible'), 'refreshCw',
+  <?= stat_card(__('upd_rollback', 'Rollback'), $hasRollback ? 'v' . $rollbackVersion : __('upd_not_available', 'No disponible'), '',
        ['sub' => $hasRollback ? __('upd_sub_saved_prev', 'Versión anterior guardada') : __('upd_sub_created_before', 'Se crea antes de cada update')]) ?>
-  <?= stat_card(__('upd_total_applied', 'Actualizaciones'), (string)count($history), 'check', ['sub' => __('upd_applied_total', 'aplicadas en total')]) ?>
+  <?= stat_card(__('upd_total_applied', 'Actualizaciones'), (string)count($history), '', ['sub' => __('upd_applied_total', 'aplicadas en total')]) ?>
 </div>
 
 <!-- Buscar actualización -->

@@ -158,10 +158,10 @@ try {
 </div>
 
 <div class="stat-grid">
-  <?= stat_card(__('fedi_federated_accounts', 'Cuentas federadas'), (string)count($podcasts), 'users', ['sub'=>__('fedi_one_per_podcast', 'Una por podcast')]) ?>
-  <?= stat_card(__('fedi_total_followers', 'Seguidores totales'), number_format($total_followers), 'users', ['sub'=>'ActivityPub']) ?>
-  <?= stat_card(__('fedi_published_notes', 'Notas publicadas'), number_format($total_notes), 'rss', ['sub'=>__('fedi_federated_episodes', 'Episodios federados')]) ?>
-  <?= stat_card(__('fedi_blocked_domains', 'Dominios bloqueados'), (string)count($blocked_domains), 'x', ['sub'=>__('fedi_local_list', 'Lista local')]) ?>
+  <?= stat_card(__('fedi_federated_accounts', 'Cuentas federadas'), (string)count($podcasts), '', ['sub'=>__('fedi_one_per_podcast', 'Una por podcast')]) ?>
+  <?= stat_card(__('fedi_total_followers', 'Seguidores totales'), number_format($total_followers), '', ['sub'=>'ActivityPub']) ?>
+  <?= stat_card(__('fedi_published_notes', 'Notas publicadas'), number_format($total_notes), '', ['sub'=>__('fedi_federated_episodes', 'Episodios federados')]) ?>
+  <?= stat_card(__('fedi_blocked_domains', 'Dominios bloqueados'), (string)count($blocked_domains), '', ['sub'=>__('fedi_local_list', 'Lista local')]) ?>
 </div>
 
 <div class="card card-lg" style="padding:28px;margin-top:24px">

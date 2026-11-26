@@ -117,12 +117,12 @@ if ($audioBytes > 0) {
 $pod_playback = kp_op3_podcast_playback_stats((int)$p['id'], 30);
 ?>
 <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
-  <?= stat_card(__('pod_stat_episodes', 'Episodios'), (string)$p['episodes'], 'headphones', $subText ? ['sub'=>$subText] : []) ?>
-  <?= stat_card(__('pod_stat_storage', 'Almacenamiento'), $formattedBytes, 'layers', ['sub'=>__('pod_stat_storage_sub', 'solo audios')]) ?>
-  <?= stat_card(__('pod_stat_downloads_7d', 'Descargas · 7d'), fmt_num($p['downloads7']), 'download', ['delta'=>['dir'=>$p['growth']>=0?'up':'down','val'=>($p['growth']>=0?'+':'').$p['growth'].'%']]) ?>
-  <?= stat_card(__('pod_stat_unique_listeners', 'Oyentes únicos'), fmt_num($p['unique_listeners'] ?? 0), 'users', ['sub' => __('pod_stat_listeners_op3_sub', 'estimado por OP3')]) ?>
-  <?= stat_card(__('pod_stat_avg_playback', 'Tiempo promedio'), $pod_playback['avg_playback_fmt'], 'clock', ['sub' => $pod_playback['avg_completion_pct'] > 0 ? ($pod_playback['avg_completion_pct'] . '% ' . __('pod_stat_retention_sub', 'retención media')) : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
-  <?= stat_card(__('pod_stat_total_listened', 'Tiempo consumido'), $pod_playback['total_time_fmt'], 'volumeHigh', ['sub' => $pod_playback['total_time_fmt'] !== '—' ? __('pod_stat_sponsors_sub', 'atención de audiencia') : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
+  <?= stat_card(__('pod_stat_episodes', 'Episodios'), (string)$p['episodes'], '', $subText ? ['sub'=>$subText] : []) ?>
+  <?= stat_card(__('pod_stat_storage', 'Almacenamiento'), $formattedBytes, '', ['sub'=>__('pod_stat_storage_sub', 'solo audios')]) ?>
+  <?= stat_card(__('pod_stat_downloads_7d', 'Descargas · 7d'), fmt_num($p['downloads7']), '', ['delta'=>['dir'=>$p['growth']>=0?'up':'down','val'=>($p['growth']>=0?'+':'').$p['growth'].'%']]) ?>
+  <?= stat_card(__('pod_stat_unique_listeners', 'Oyentes únicos'), fmt_num($p['unique_listeners'] ?? 0), '', ['sub' => __('pod_stat_listeners_op3_sub', 'estimado por OP3')]) ?>
+  <?= stat_card(__('pod_stat_avg_playback', 'Tiempo promedio'), $pod_playback['avg_playback_fmt'], '', ['sub' => $pod_playback['avg_completion_pct'] > 0 ? ($pod_playback['avg_completion_pct'] . '% ' . __('pod_stat_retention_sub', 'retención media')) : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
+  <?= stat_card(__('pod_stat_total_listened', 'Tiempo consumido'), $pod_playback['total_time_fmt'], '', ['sub' => $pod_playback['total_time_fmt'] !== '—' ? __('pod_stat_sponsors_sub', 'atención de audiencia') : __('pod_stat_no_telemetry', 'esperando telemetría web')]) ?>
 </div>
 
 <div class="card" style="margin-top:var(--gap)">

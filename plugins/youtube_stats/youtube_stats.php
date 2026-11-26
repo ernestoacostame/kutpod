@@ -625,7 +625,7 @@ kp_add_action('analytics_stat_grid', function() {
         $row = kp_one("SELECT COALESCE(SUM(views), 0) AS total_views FROM youtube_episode_stats");
         $views = (int)($row['total_views'] ?? 0);
         if ($views > 0) {
-            echo stat_card('Vistas YouTube', number_format($views), 'play', ['sub' => 'Vía RSS de YouTube']);
+            echo stat_card('Vistas YouTube', number_format($views), '', ['sub' => 'Vía RSS de YouTube']);
         }
     } catch (Throwable $e) {}
 });

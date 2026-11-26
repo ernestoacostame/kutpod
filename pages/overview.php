@@ -96,10 +96,10 @@ try {
 </div>
 
 <div class="stat-grid">
-  <?= stat_card(__('overview_stat_downloads_7d'), fmt_num($tot7), 'download', ['sub'=>$tot7 ? 'OP3' : (kp_detect_lang()==='en'?'No traffic yet':'Aún sin tráfico')]) ?>
-  <?= stat_card(__('overview_stat_downloads_total'), fmt_num($tot), 'chart', ['sub'=>$tot ? (kp_detect_lang()==='en'?'all time':'desde el primer ep') : '—']) ?>
-  <?= stat_card(__('overview_stat_episodes'), (string)$totalEps, 'headphones', ['sub'=>$drafts ? "$drafts " . (kp_detect_lang()==='en'?'drafts in queue':'borradores en cola') : (kp_detect_lang()==='en'?'No drafts':'Sin borradores')]) ?>
-  <?= stat_card(__('overview_stat_followers'), fmt_num($subs), 'rss', ['sub'=>'ActivityPub']) ?>
+  <?= stat_card(__('overview_stat_downloads_7d'), fmt_num($tot7), '', ['sub'=>$tot7 ? 'OP3' : (kp_detect_lang()==='en'?'No traffic yet':'Aún sin tráfico')]) ?>
+  <?= stat_card(__('overview_stat_downloads_total'), fmt_num($tot), '', ['sub'=>$tot ? (kp_detect_lang()==='en'?'all time':'desde el primer ep') : '—']) ?>
+  <?= stat_card(__('overview_stat_episodes'), (string)$totalEps, '', ['sub'=>$drafts ? "$drafts " . (kp_detect_lang()==='en'?'drafts in queue':'borradores en cola') : (kp_detect_lang()==='en'?'No drafts':'Sin borradores')]) ?>
+  <?= stat_card(__('overview_stat_followers'), fmt_num($subs), '', ['sub'=>'ActivityPub']) ?>
 </div>
 
 <?php if (!$has_podcasts): ?>

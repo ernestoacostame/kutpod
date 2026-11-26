@@ -399,7 +399,17 @@ function renderPodcastFollowersModal(rows) {
   }
 
   listEl.innerHTML = rows.map(f => {
-    const label = (f.handle && f.handle.trim()) ? f.handle : (f.actor_url || '?');
+    let label = (f.handle && f.handle.trim() && f.handle.trim() !== '?') ? f.handle.trim() : '';
+    if (!label && f.actor_url) {
+      try {
+        const u = new URL(f.actor_url);
+        const seg = u.pathname.replace(/\/+$/, '').split('/').pop() || '';
+        label = seg ? `@${seg}@${u.host}` : f.actor_url;
+      } catch (e) {
+        label = f.actor_url;
+      }
+    }
+    if (!label) label = '?';
     const initial = label.replace(/^@/, '').charAt(0).toUpperCase() || '?';
     const actorUrl = f.actor_url || '#';
     const inbox = f.inbox || '';

@@ -361,11 +361,13 @@ function kp_ap_inbox(string $slug): void {
     case 'Follow':
       $actor = is_array($a['actor'] ?? null) ? ($a['actor']['id'] ?? '') : ($a['actor'] ?? '');
       $info = kp_ap_fetch_actor($actor);
-      $handle = $info['preferredUsername'] ?? '?';
+      $fallbackUser = basename(rtrim((string)parse_url($actor, PHP_URL_PATH), '/'));
+      $handle = !empty($info['preferredUsername']) ? $info['preferredUsername'] : ($fallbackUser ?: '?');
       $name = $info['name'] ?? $handle;
       $avatar = $info['icon']['url'] ?? '';
+      $inbox = !empty($info['inbox']) ? $info['inbox'] : ($actor ? rtrim($actor, '/') . '/inbox' : '');
       kp_exec("INSERT OR IGNORE INTO ap_followers (podcast_id,actor_url,handle,inbox) VALUES (?,?,?,?)",
-        [$p['id'], $actor, $handle, ($info['inbox'] ?? '')]);
+        [$p['id'], $actor, $handle, $inbox]);
       kp_ap_send_accept($p, $a);
       require_once __DIR__ . '/includes/helpers.php';
       kp_alert('fediverse', 'Nuevo seguidor', "@{$handle} ha comenzado a seguir a tu podcast '{$p['title']}'.", $actor, [

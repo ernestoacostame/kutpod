@@ -1,0 +1,10 @@
+{
+  "id": "external_metrics",
+  "name": "Importador de Métricas (Apple / Spotify)",
+  "name_en": "External Metrics Importer (Apple / Spotify)",
+  "version": "1.0.0",
+  "description": "Importa archivos CSV de Apple Podcasts Connect y Spotify for Creators para combinar retención y tiempo medio de escucha con OP3. Al desactivar el plugin, las métricas importadas se retiran de todas las estadísticas.",
+  "description_en": "Import Apple Podcasts Connect and Spotify for Creators CSV reports to combine retention and average playback time with OP3. Disabling the plugin removes imported stats from all analytics.",
+  "author": "KutPod",
+  "main": "external_metrics.php"
+}

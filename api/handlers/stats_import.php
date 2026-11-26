@@ -11,6 +11,10 @@ require_once __DIR__ . '/../../includes/helpers.php';
 require_once __DIR__ . '/../../includes/op3-tracker.php';
 require_once __DIR__ . '/../../includes/op3-importer.php';
 
+if (!kp_plugin_is_active('external_metrics')) {
+    api_error(403, 'plugin_disabled', 'El plugin de importación de métricas externas está desactivado.');
+}
+
 // 1. Autenticación: verificar sesión por cookie web o Bearer token
 $user = kp_current_user();
 $viaCookie = (bool)$user;

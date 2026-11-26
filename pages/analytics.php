@@ -242,7 +242,9 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
       <?= rng_btn('mtd', __('analytics_range_mtd', 'Este mes'), $range, $active_tab) ?>
       <?= rng_btn('all', __('analytics_range_all', 'Histórico'), $range, $active_tab) ?>
     </div>
+    <?php if (kp_plugin_is_active('external_metrics')): ?>
     <button type="button" class="btn" onclick="openImportMetricsModal()"><?= icon('upload',13) ?> <?= __('analytics_import_csv', 'Importar métricas') ?></button>
+    <?php endif; ?>
     <a class="btn" href="/api/v1/stats/export.csv?range=<?= e($range) ?>"><?= icon('download',13) ?> <?= __('analytics_export_csv', 'Exportar CSV') ?></a>
   </div>
 </div>
@@ -520,8 +522,8 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
       </div>
     </div>
 
-    <!-- Sección de retención y métricas de plataformas externas (Apple Podcasts & Spotify) -->
-    <?php
+    <!-- Sección de retención y métricas de plataformas externas (solo si el plugin external_metrics está activo) -->
+    <?php if (kp_plugin_is_active('external_metrics')):
       $recentExtStats = [];
       try {
         $recentExtStats = kp_q("
@@ -605,6 +607,7 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
         </div>
       <?php endif; ?>
     </div>
+    <?php endif; ?>
   </div>
 
   <!-- PESTAÑA: RENDIMIENTO COMPARATIVO (EPISODE PERFORMANCE) -->
@@ -1481,4 +1484,4 @@ function rng_btn($k, $l, $cur, $tab = 'downloads', $page = 'analytics') {
 
 <?php endif; ?>
 
-<?php require_once __DIR__ . '/../includes/views/modal-import-metrics.php'; ?>
+<?php if (kp_plugin_is_active('external_metrics')) { require_once __DIR__ . '/../includes/views/modal-import-metrics.php'; } ?>

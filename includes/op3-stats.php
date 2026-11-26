@@ -309,23 +309,25 @@ function kp_op3_episode_playback_stats(int $episodeId, int $days = 30): array {
     }
   } catch (Throwable $e) {}
 
-  // Métricas de plataformas externas importadas (Apple Podcasts, Spotify, etc.)
+  // Métricas de plataformas externas importadas (solo si el plugin external_metrics está activo)
   $appleStats = null;
   $spotifyStats = null;
   $extRows = [];
-  try {
-    $extRows = kp_q("
-      SELECT platform, plays, listeners, avg_playback_secs, completion_pct, total_time_secs, imported_at
-      FROM external_platform_stats
-      WHERE episode_id = ?
-    ", [$episodeId]);
-    if ($extRows) {
-      foreach ($extRows as $er) {
-        if ($er['platform'] === 'apple')   $appleStats = $er;
-        if ($er['platform'] === 'spotify') $spotifyStats = $er;
+  if (function_exists('kp_plugin_is_active') && kp_plugin_is_active('external_metrics')) {
+    try {
+      $extRows = kp_q("
+        SELECT platform, plays, listeners, avg_playback_secs, completion_pct, total_time_secs, imported_at
+        FROM external_platform_stats
+        WHERE episode_id = ?
+      ", [$episodeId]);
+      if ($extRows) {
+        foreach ($extRows as $er) {
+          if ($er['platform'] === 'apple')   $appleStats = $er;
+          if ($er['platform'] === 'spotify') $spotifyStats = $er;
+        }
       }
-    }
-  } catch (Throwable $e) {}
+    } catch (Throwable $e) {}
+  }
 
   // Fuentes con retención medida
   $sources = [];

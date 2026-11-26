@@ -102,7 +102,9 @@ if ($audioBytes > 0) {
     <?php else: ?>
       <button class="btn" disabled style="opacity:0.5;cursor:not-allowed" title="<?= __('pod_op3_disabled_hint', 'OP3 no está activo para este show') ?>"><?= icon('chart',13) ?> OP3</button>
     <?php endif; ?>
+    <?php if (kp_plugin_is_active('external_metrics')): ?>
     <button type="button" class="btn" onclick="openImportMetricsModal(<?= (int)$p['id'] ?>, '<?= e(addslashes($p['title'])) ?>')"><?= icon('upload',13) ?> <?= __('analytics_import_csv', 'Importar métricas') ?></button>
+    <?php endif; ?>
     <a class="btn" href="/api/v1/stats/export.csv?podcast=<?= e($p['id']) ?>&range=30d" title="<?= __('analytics_export_csv', 'Exportar CSV') ?>"><?= icon('download',13) ?> <?= __('analytics_export_csv', 'Exportar CSV') ?></a>
     <a class="btn" href="/@<?= e($p['id']) ?>/feed.xml" target="_blank" download="feed.xml"><?= icon('rss',13) ?> <?= __('pod_export_rss', 'Exportar RSS') ?></a>
     <a class="btn" href="/admin/broadcast?podcast=<?= e($p['id']) ?>"><?= icon('globe',13) ?> Broadcast</a>
@@ -193,4 +195,4 @@ $pod_playback = kp_op3_podcast_playback_stats((int)$p['id'], 30);
   </div>
 </div>
 
-<?php require_once __DIR__ . '/../includes/views/modal-import-metrics.php'; ?>
+<?php if (kp_plugin_is_active('external_metrics')) { require_once __DIR__ . '/../includes/views/modal-import-metrics.php'; } ?>

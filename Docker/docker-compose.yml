@@ -1,0 +1,23 @@
+services:
+  kutpod:
+    build:
+      context: ..
+      dockerfile: Docker/Dockerfile
+    container_name: kutpod
+    ports:
+      - "${KUTPOD_PORT:-8080}:8080"
+    volumes:
+      - kutpod_storage:/var/www/html/storage
+    environment:
+      TZ: "${TZ:-UTC}"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/robots.txt"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  kutpod_storage:
+    driver: local
